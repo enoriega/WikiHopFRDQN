@@ -68,9 +68,9 @@ class EmbeddingsHelper:
     def __getitem__(self, word):
         is_pretrained, ix = self.index(word)
         if is_pretrained:
-            return self.pretrained_embeddings(torch.LongTensor([[ix]]))  # TODO: Check the argument of LongTensor
+            return self.pretrained_embeddings(torch.LongTensor([ix]))
         else:
-            return self.fresh_embeddings(torch.LongTensor([[ix]]))
+            return self.fresh_embeddings(torch.LongTensor([ix]))
 
     def __len__(self):
         return len(self.existing_terms)

@@ -13,7 +13,8 @@ if __name__ == "__main__":
     # embeddings = nn.Embedding.from_pretrained(torch.from_numpy(helper.matrix))
 
     words = ['the', 'rain', 'mexico', 'montytronic', 'warmian']
-    embs = np.stack([helper[w].detach().numpy() for w in words])
+    embs = [helper[w].detach().numpy() for w in words]
+    embs = np.stack(embs)
     # indices = torch.LongTensor([helper[w] for w in words])
     # embs = embeddings(indices)
     i = 0
