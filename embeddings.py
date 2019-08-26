@@ -77,3 +77,17 @@ class EmbeddingsHelper:
 
     def dimensions(self):
         return self.matrix.shape[1]
+
+    @staticmethod
+    def aggregate_embeddings(embs):
+        m = torch.stack([e.squeeze() for e in embs])
+        return torch.mean(m, dim=0)
+
+    def distance(self, entity_a, entity_b):
+
+        embs_a = [self[a] for a in entity_a]
+        embs_b = [self[b] for b in entity_b]
+        ea = EmbeddingsHelper.aggregate_embeddings(embs_a)
+        eb = EmbeddingsHelper.aggregate_embeddings(embs_b)
+
+        return torch.dist(ea, eb)

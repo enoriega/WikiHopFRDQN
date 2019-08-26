@@ -1,7 +1,15 @@
 import json
+import torch
 from flask import Flask, url_for, request
 
+from embeddings import EmbeddingsHelper
+
 app = Flask(__name__)
+
+glove_path = "/Users/enrique/github/WikiHopFR/glove/glove.6B.50d.txt"
+voc_path = "/Users/enrique/github/WikiHopFR/w2vvoc.txt"
+
+helper = EmbeddingsHelper(glove_path, voc_path)
 
 
 @app.route('/')
@@ -30,8 +38,13 @@ def backwards():
 @app.route('/distance', methods=['GET', 'PUT'])
 def distance():
     if request.method == "PUT":
-        data = json.loads(request.data)
-        return json.dumps([1.0, 0.0])
+        with torch.no_grad():
+            data = json.loads(request.data)
+            entity_a, entity_b = data["A"], data["B"]
+            dist = helper.distance(entity_a, entity_b)
+
+        return dist.detach().item()
+
     else:
         return "Use the PUT method"
 
