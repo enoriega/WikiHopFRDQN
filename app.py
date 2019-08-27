@@ -40,10 +40,10 @@ def distance():
     if request.method == "PUT":
         with torch.no_grad():
             data = json.loads(request.data)
-            entity_a, entity_b = data["A"], data["B"]
-            dist = helper.distance(entity_a, entity_b)
+            pairs = [(d["A"], d["B"]) for d in data]
+            dists = helper.distance(pairs)
 
-        return dist.detach().item()
+        return json.dumps(dists)
 
     else:
         return "Use the PUT method"
