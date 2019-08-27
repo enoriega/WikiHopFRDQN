@@ -1,0 +1,3 @@
+embeddings:
+  glove_path: "/Users/enrique/github/WikiHopFR/glove/glove.6B.50d.txt"
+  voc_path: "/Users/enrique/github/WikiHopFR/w2vvoc.txt"

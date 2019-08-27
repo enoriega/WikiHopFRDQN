@@ -3,6 +3,11 @@ import torch
 from torch import nn
 from embeddings import EmbeddingsHelper
 
+
+# class DQN:
+#
+#     def
+
 if __name__ == "__main__":
     # TODO: Parameterize paths
     glove_path = "/Users/enrique/github/WikiHopFR/glove/glove.6B.50d.txt"

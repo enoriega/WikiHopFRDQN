@@ -1,13 +1,19 @@
 import json
 import torch
-from flask import Flask, url_for, request
+import yaml
+from flask import Flask, request
 
 from embeddings import EmbeddingsHelper
 
 app = Flask(__name__)
 
-glove_path = "/Users/enrique/github/WikiHopFR/glove/glove.6B.50d.txt"
-voc_path = "/Users/enrique/github/WikiHopFR/w2vvoc.txt"
+with open('config.yml', Loader=yaml.FullLoader) as f:
+    cfg = yaml.load(f)
+
+embeddings_cfg = cfg['embeddings']
+
+glove_path = embeddings_cfg['glove_path']
+voc_path =  embeddings_cfg['voc_path']
 
 helper = EmbeddingsHelper(glove_path, voc_path)
 

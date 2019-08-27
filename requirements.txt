@@ -1,3 +1,4 @@
+torch
 altgraph==0.16.1
 appnope==0.1.0
 attrs==18.2.0
