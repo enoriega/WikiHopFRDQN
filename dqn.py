@@ -4,9 +4,20 @@ from torch import nn
 from embeddings import EmbeddingsHelper
 
 
-# class DQN:
-#
-#     def
+class DQN(nn.Module):
+
+    def __init__(self, embeddings_helper):
+        super().__init__()
+
+        # Store the helper to use it on the forward method
+        self.e_helper = embeddings_helper
+        # This is necessary for the instance to recognize the embeddings as parameters of the network
+        self.pretrained_embeddings = embeddings_helper.pretrained_embeddings
+        self.fresh_embeddings = embeddings_helper.fresh_embeddings
+
+    def forward(self, input):
+        return None
+
 
 if __name__ == "__main__":
     # TODO: Parameterize paths

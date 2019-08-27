@@ -13,7 +13,7 @@ with open('config.yml', Loader=yaml.FullLoader) as f:
 embeddings_cfg = cfg['embeddings']
 
 glove_path = embeddings_cfg['glove_path']
-voc_path =  embeddings_cfg['voc_path']
+voc_path = embeddings_cfg['voc_path']
 
 helper = EmbeddingsHelper(glove_path, voc_path)
 
