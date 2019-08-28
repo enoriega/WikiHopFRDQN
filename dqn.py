@@ -6,7 +6,7 @@ from embeddings import EmbeddingsHelper
 
 class DQN(nn.Module):
 
-    def __init__(self, embeddings_helper):
+    def __init__(self, num_feats, embeddings_helper):
         super().__init__()
 
         # Store the helper to use it on the forward method
@@ -15,14 +15,26 @@ class DQN(nn.Module):
         self.pretrained_embeddings = embeddings_helper.pretrained_embeddings
         self.fresh_embeddings = embeddings_helper.fresh_embeddings
 
+        k = num_feats + embeddings_helper.dimensions()*2
+
+        # Layers of the network
+        self.layers = nn.Sequential(
+            nn.Linear(k, 20),
+            nn.ReLU(),
+            nn.Linear(20, 10),
+            nn.ReLU(),
+            nn.Linear(10, 2),
+            nn.LogSoftmax(dim=1)
+        )
+
     def forward(self, data):
 
         # Parse the input data into tensor form
         batch = self.tensor_form(data)
 
-        # TODO Feed it forward into the layers of the network
+        values = self.layers(batch)
 
-        return None
+        return values
 
     def tensor_form(self, data):
         # Convert the raw data to tensor form
@@ -36,8 +48,8 @@ class DQN(nn.Module):
             entity_b = input['B']
 
             # Query the helper for the aggregated embeddings of the entities
-            ea = helper.aggregated_embedding(entity_a)
-            eb = helper.aggregated_embedding(entity_b)
+            ea = self.e_helper.aggregated_embedding(entity_a)
+            eb = self.e_helper.aggregated_embedding(entity_b)
 
             # Build a vector out of the numerical features, sorted by feature name
             f = [features[k] for k in sorted(features)]
@@ -57,12 +69,16 @@ class DQN(nn.Module):
 
     @staticmethod
     def raw2json(raw_vals):
-        # TODO Implement this
-        return [{"Exploration": 9.1, "Exploitation": 1.0} for v in raw_vals]
+        ret = list()
+
+        for row in raw_vals.split(1):
+            row = row.squeeze()
+            ret.append({"Exploration": row[0].item(), "Exploitation": row[1].item()})
+
+        return ret
 
 
 if __name__ == "__main__":
-    # TODO: Parameterize paths
     glove_path = "/Users/enrique/github/WikiHopFR/glove/glove.6B.50d.txt"
     voc_path = "/Users/enrique/github/WikiHopFR/w2vvoc.txt"
 
@@ -84,8 +100,12 @@ if __name__ == "__main__":
         'B':['Gina', 'Chistosina']
     }]
 
-    network = DQN(helper)
-    network(test_data)
+    network = DQN(2, helper)
+
+    with torch.no_grad():
+        vals = network(test_data)
+
+    x = DQN.raw2json(vals)
 
     # embeddings = nn.Embedding.from_pretrained(torch.from_numpy(helper.matrix))
 

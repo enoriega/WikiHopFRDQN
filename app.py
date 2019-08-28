@@ -8,8 +8,8 @@ from embeddings import EmbeddingsHelper
 
 app = Flask(__name__)
 
-with open('config.yml', Loader=yaml.FullLoader) as f:
-    cfg = yaml.load(f)
+with open('config.yml') as f:
+    cfg = yaml.load(f, Loader=yaml.FullLoader)
 
 embeddings_cfg = cfg['embeddings']
 
@@ -17,8 +17,6 @@ glove_path = embeddings_cfg['glove_path']
 voc_path = embeddings_cfg['voc_path']
 
 helper = EmbeddingsHelper(glove_path, voc_path)
-network = DQN(helper)
-
 
 @app.route('/')
 def api_root():
@@ -29,9 +27,15 @@ def api_root():
 def forward():
     if request.method == "PUT":
         data = json.loads(request.data)
-        raw_values = network(data)
-        values = DQN.raw2json(raw_values)
-        return values
+
+        k = len(data[0]['features'])
+        network = DQN(k, helper)
+
+        with torch.no_grad():
+            raw_values = network(data)
+            values = DQN.raw2json(raw_values)
+
+        return json.dumps(values)
         # return {"Exploration": 9.1, "Exploitation": 1.0}
     else:
         return "Use the PUT method"
