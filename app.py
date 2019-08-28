@@ -3,6 +3,7 @@ import torch
 import yaml
 from flask import Flask, request
 
+from dqn import DQN
 from embeddings import EmbeddingsHelper
 
 app = Flask(__name__)
@@ -16,6 +17,7 @@ glove_path = embeddings_cfg['glove_path']
 voc_path = embeddings_cfg['voc_path']
 
 helper = EmbeddingsHelper(glove_path, voc_path)
+network = DQN(helper)
 
 
 @app.route('/')
@@ -27,7 +29,10 @@ def api_root():
 def forward():
     if request.method == "PUT":
         data = json.loads(request.data)
-        return {"Exploration": 9.1, "Exploitation": 1.0}
+        raw_values = network(data)
+        values = DQN.raw2json(raw_values)
+        return values
+        # return {"Exploration": 9.1, "Exploitation": 1.0}
     else:
         return "Use the PUT method"
 

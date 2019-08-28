@@ -26,7 +26,7 @@ class EmbeddingsHelper:
         it1, it2 = it.tee((t[0], np.asarray([float(d) for d in t[1:]])) for t in (l.split() for l in lines))
 
         existing_terms = {i[0]: ix for ix, i in enumerate(it1)}
-        matrix = np.stack([i[1] for i in it2])
+        matrix = np.stack([i[1] for i in it2]).astype(float)
 
         missing_terms = {t: ix for ix, t in enumerate((sanitized_terms - existing_terms.keys()) | {"xnumx", "OOV"})}
 
@@ -68,15 +68,19 @@ class EmbeddingsHelper:
     def __getitem__(self, word):
         is_pretrained, ix = self.index(word)
         if is_pretrained:
-            return self.pretrained_embeddings(torch.LongTensor([ix]))
+            return self.pretrained_embeddings(torch.LongTensor([ix])).float()
         else:
-            return self.fresh_embeddings(torch.LongTensor([ix]))
+            return self.fresh_embeddings(torch.LongTensor([ix])).float()
 
     def __len__(self):
         return len(self.existing_terms)
 
     def dimensions(self):
         return self.matrix.shape[1]
+
+    def aggregated_embedding(self, tokens):
+        embs_a = [self[a] for a in tokens]
+        return EmbeddingsHelper.aggregate_embeddings(embs_a)
 
     @staticmethod
     def aggregate_embeddings(embs):
@@ -88,10 +92,8 @@ class EmbeddingsHelper:
         ret = list()
 
         for entity_a, entity_b in entities:
-            embs_a = [self[a] for a in entity_a]
-            embs_b = [self[b] for b in entity_b]
-            ea = EmbeddingsHelper.aggregate_embeddings(embs_a)
-            eb = EmbeddingsHelper.aggregate_embeddings(embs_b)
+            ea = self.aggregate_embeddings(entity_a)
+            eb = self.aggregate_embeddings(entity_b)
 
             ret.append(torch.dist(ea, eb).detach().item())
 
