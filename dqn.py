@@ -32,6 +32,7 @@ class DQN(nn.Module):
         # Parse the input data into tensor form
         batch = self.tensor_form(data)
 
+        # Feed the batch  through the network's layers
         values = self.layers(batch)
 
         return values
@@ -100,7 +101,9 @@ if __name__ == "__main__":
         'B':['Gina', 'Chistosina']
     }]
 
-    network = DQN(2, helper)
+    k = len(test_data[0]['features'])
+
+    network = DQN(k, helper)
 
     with torch.no_grad():
         vals = network(test_data)

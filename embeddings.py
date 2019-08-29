@@ -92,8 +92,8 @@ class EmbeddingsHelper:
         ret = list()
 
         for entity_a, entity_b in entities:
-            ea = self.aggregate_embeddings(entity_a)
-            eb = self.aggregate_embeddings(entity_b)
+            ea = self.aggregated_embedding(entity_a)
+            eb = self.aggregated_embedding(entity_b)
 
             ret.append(torch.dist(ea, eb).detach().item())
 

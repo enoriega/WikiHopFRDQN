@@ -18,6 +18,9 @@ voc_path = embeddings_cfg['voc_path']
 
 helper = EmbeddingsHelper(glove_path, voc_path)
 
+network = None
+
+
 @app.route('/')
 def api_root():
     return 'Welcome to the magic of Deep Reinforcement Learning'
@@ -28,15 +31,19 @@ def forward():
     if request.method == "PUT":
         data = json.loads(request.data)
 
-        k = len(data[0]['features'])
-        network = DQN(k, helper)
+        # If this is the first time this is called, lazily build the network
+        # This is necessary to compute the number features dynamically
+        global network
+        if not network:
+            k = len(data[0]['features'])
+            network = DQN(k, helper)
 
+        # Don't need to hold to the gradient here
         with torch.no_grad():
             raw_values = network(data)
             values = DQN.raw2json(raw_values)
 
         return json.dumps(values)
-        # return {"Exploration": 9.1, "Exploitation": 1.0}
     else:
         return "Use the PUT method"
 
@@ -53,6 +60,7 @@ def backwards():
 @app.route('/distance', methods=['GET', 'PUT'])
 def distance():
     if request.method == "PUT":
+        # Don't need to hold to the gradient here
         with torch.no_grad():
             data = json.loads(request.data)
             pairs = [(d["A"], d["B"]) for d in data]
