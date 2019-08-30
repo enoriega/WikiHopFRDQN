@@ -1,5 +1,7 @@
 import numpy as np
 import torch
+import itertools as it
+import torch.nn.functional as F
 from torch import nn
 from embeddings import EmbeddingsHelper
 
@@ -15,7 +17,7 @@ class DQN(nn.Module):
         self.pretrained_embeddings = embeddings_helper.pretrained_embeddings
         self.fresh_embeddings = embeddings_helper.fresh_embeddings
 
-        k = num_feats + embeddings_helper.dimensions()*2
+        k = num_feats + embeddings_helper.dimensions() * 2
 
         # Layers of the network
         self.layers = nn.Sequential(
@@ -44,7 +46,50 @@ class DQN(nn.Module):
         action_values = self(states)
         # The next_action_values computation is tricky, as it involves looking at many possible states
         # TODO: Implement correctly next_action_values
-        next_action_values = action_values.clone().detach()
+        # next_action_values = action_values.clone().detach()
+        with torch.no_grad():
+            pairs, next_action_values = self.select_action(next_states)
+
+        GAMMA = 0.9 # TODO parameterize this
+        updates = [r + GAMMA*q.max() for r, q in zip(rewards, next_action_values.detach())]
+
+        target_values = action_values.clone().detach()
+
+        for row_ix, action in enumerate(actions):
+            col_ix = 0 if action == "exploration" else 1
+            target_values[row_ix, col_ix] = updates[row_ix]
+
+        loss = F.mse_loss(action_values, target_values)
+
+        return loss
+
+    def select_action(self, data):
+
+        ret_tensors = list()
+        ret_pairs = list()
+
+        for d in data:
+            # First, compute cartesian product of the candidate entities
+            candidate_entities = d['candidates']
+            candidate_pairs = list(it.product(candidate_entities, candidate_entities))
+            inputs = [{'features':d['features'], 'A':a, 'B':b} for a, b in candidate_pairs]
+            action_values = self(inputs)
+            # Get the index of the row with the max value
+            max_val = float("-inf")
+            row_ix = 0
+            row_vals = None
+
+            for ix, row in enumerate(action_values):
+                row_max = row.max()
+                if row_max > max_val:
+                    max_val = row_max
+                    row_ix = ix
+                    row_vals = row
+
+            ret_tensors.append(row_vals)
+            ret_pairs.append(candidate_pairs[row_ix])
+
+        return ret_pairs, torch.cat(ret_tensors).view((len(ret_tensors), -1))
 
     def tensor_form(self, data):
         # Convert the raw data to tensor form
@@ -99,15 +144,15 @@ if __name__ == "__main__":
             "iteration": float(5),
             "alpha": float(10.3)
         },
-        'A':['enrique', 'noriega'],
-        'B':['Cecilia', 'Montano']
+        'A': ['enrique', 'noriega'],
+        'B': ['Cecilia', 'Montano']
     }, {
         'features': {
             "iteration": float(34),
             "alpha": float(15.0)
         },
-        'A':['Diego', 'Andres'],
-        'B':['Gina', 'Chistosina']
+        'A': ['Diego', 'Andres'],
+        'B': ['Gina', 'Chistosina']
     }]
 
     k = len(test_data[0]['features'])

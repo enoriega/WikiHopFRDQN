@@ -1,6 +1,7 @@
 import json
 import torch
 import yaml
+import torch.optim as optim
 from flask import Flask, request
 
 from dqn import DQN
@@ -19,6 +20,7 @@ voc_path = embeddings_cfg['voc_path']
 helper = EmbeddingsHelper(glove_path, voc_path)
 
 network = None
+trainer = None
 
 
 @app.route('/')
@@ -57,7 +59,19 @@ def backwards():
             k = len(data[0]['state']['features'])
             network = DQN(k, helper)
 
-        network.backprop(data)
+        global trainer
+        if not trainer:
+            trainer = optim.RMSprop(network.parameters())
+
+        loss = network.backprop(data)
+
+        # Optimize the model
+        trainer.zero_grad()
+        loss.backward()
+        for param in network.parameters():
+            param.grad.data.clamp_(-1, 1)
+        trainer.step()
+
         return "Performed a back propagation step"
 
     else:
