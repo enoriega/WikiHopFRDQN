@@ -52,7 +52,14 @@ def forward():
 def backwards():
     if request.method == "PUT":
         data = json.loads(request.data)
+        global network
+        if not network:
+            k = len(data[0]['state']['features'])
+            network = DQN(k, helper)
+
+        network.backprop(data)
         return "Performed a back propagation step"
+
     else:
         return "Use the PUT method"
 

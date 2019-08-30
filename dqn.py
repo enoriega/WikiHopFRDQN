@@ -37,6 +37,15 @@ class DQN(nn.Module):
 
         return values
 
+    def backprop(self, data):
+
+        # Parse the data
+        states, actions, rewards, next_states = zip(*(d.values() for d in data))
+        action_values = self(states)
+        # The next_action_values computation is tricky, as it involves looking at many possible states
+        # TODO: Implement correctly next_action_values
+        next_action_values = action_values.clone().detach()
+
     def tensor_form(self, data):
         # Convert the raw data to tensor form
         batch = list()
