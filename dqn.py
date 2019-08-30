@@ -1,11 +1,11 @@
-import numpy as np
-import torch
 import itertools as it
+
+import torch
 import torch.nn.functional as F
 from torch import nn
-from embeddings import EmbeddingsHelper
 
 
+# noinspection PyArgumentList
 class DQN(nn.Module):
 
     def __init__(self, num_feats, embeddings_helper):
@@ -48,7 +48,7 @@ class DQN(nn.Module):
         with torch.no_grad():
             pairs, next_action_values = self.select_action(next_states)
 
-        updates = [r + gamma*q.max() for r, q in zip(rewards, next_action_values.detach())]
+        updates = [r + gamma * q.max() for r, q in zip(rewards, next_action_values.detach())]
 
         target_values = action_values.clone().detach()
 
@@ -69,7 +69,7 @@ class DQN(nn.Module):
             # First, compute cartesian product of the candidate entities
             candidate_entities = d['candidates']
             candidate_pairs = list(it.product(candidate_entities, candidate_entities))
-            inputs = [{'features':d['features'], 'A':a, 'B':b} for a, b in candidate_pairs]
+            inputs = [{'features': d['features'], 'A': a, 'B': b} for a, b in candidate_pairs]
             action_values = self(inputs)
             # Get the index of the row with the max value
             max_val = float("-inf")
@@ -93,11 +93,11 @@ class DQN(nn.Module):
         batch = list()
 
         # Create an input vector for each of the elements in data
-        for input in data:
+        for datum in data:
             # Get the raw input
-            features = input['features']
-            entity_a = input['A']
-            entity_b = input['B']
+            features = datum['features']
+            entity_a = datum['A']
+            entity_b = datum['B']
 
             # Query the helper for the aggregated embeddings of the entities
             ea = self.e_helper.aggregated_embedding(entity_a)
@@ -129,46 +129,45 @@ class DQN(nn.Module):
 
         return ret
 
-
-if __name__ == "__main__":
-    glove_path = "/Users/enrique/github/WikiHopFR/glove/glove.6B.50d.txt"
-    voc_path = "/Users/enrique/github/WikiHopFR/w2vvoc.txt"
-
-    helper = EmbeddingsHelper(glove_path, voc_path)
-
-    test_data = [{
-        'features': {
-            "iteration": float(5),
-            "alpha": float(10.3)
-        },
-        'A': ['enrique', 'noriega'],
-        'B': ['Cecilia', 'Montano']
-    }, {
-        'features': {
-            "iteration": float(34),
-            "alpha": float(15.0)
-        },
-        'A': ['Diego', 'Andres'],
-        'B': ['Gina', 'Chistosina']
-    }]
-
-    k = len(test_data[0]['features'])
-
-    network = DQN(k, helper)
-
-    with torch.no_grad():
-        vals = network(test_data)
-
-    x = DQN.raw2json(vals)
-
-    # embeddings = nn.Embedding.from_pretrained(torch.from_numpy(helper.matrix))
-
-    # entity_a = ["hermosillo", "sonora"]
-    # entity_b = ["tucson", "arizona"]
-    # dist = helper.distance(entity_a, entity_b)
-    # words = ['the', 'rain', 'mexico', 'montytronic', 'warmian']
-    # embs = [helper[w].detach().numpy() for w in words]
-    # embs = np.stack(embs)
-    # indices = torch.LongTensor([helper[w] for w in words])
-    # embs = embeddings(indices)
-    i = 0
+# if __name__ == "__main__":
+#     glove_path = "/Users/enrique/github/WikiHopFR/glove/glove.6B.50d.txt"
+#     voc_path = "/Users/enrique/github/WikiHopFR/w2vvoc.txt"
+#
+#     helper = EmbeddingsHelper(glove_path, voc_path)
+#
+#     test_data = [{
+#         'features': {
+#             "iteration": float(5),
+#             "alpha": float(10.3)
+#         },
+#         'A': ['enrique', 'noriega'],
+#         'B': ['Cecilia', 'Montano']
+#     }, {
+#         'features': {
+#             "iteration": float(34),
+#             "alpha": float(15.0)
+#         },
+#         'A': ['Diego', 'Andres'],
+#         'B': ['Gina', 'Chistosina']
+#     }]
+#
+#     k = len(test_data[0]['features'])
+#
+#     network = DQN(k, helper)
+#
+#     with torch.no_grad():
+#         vals = network(test_data)
+#
+#     x = DQN.raw2json(vals)
+#
+#     # embeddings = nn.Embedding.from_pretrained(torch.from_numpy(helper.matrix))
+#
+#     # entity_a = ["hermosillo", "sonora"]
+#     # entity_b = ["tucson", "arizona"]
+#     # dist = helper.distance(entity_a, entity_b)
+#     # words = ['the', 'rain', 'mexico', 'montytronic', 'warmian']
+#     # embs = [helper[w].detach().numpy() for w in words]
+#     # embs = np.stack(embs)
+#     # indices = torch.LongTensor([helper[w] for w in words])
+#     # embs = embeddings(indices)
+#     i = 0
