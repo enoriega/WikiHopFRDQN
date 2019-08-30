@@ -50,6 +50,28 @@ def forward():
         return "Use the PUT method"
 
 
+@app.route('/select_action', methods=['GET', 'PUT'])
+def select_action():
+    if request.method == "PUT":
+        data = json.loads(request.data)
+
+        # If this is the first time this is called, lazily build the network
+        # This is necessary to compute the number features dynamically
+        global network
+        if not network:
+            k = len(data[0]['features'])
+            network = DQN(k, helper)
+
+        # Don't need to hold to the gradient here
+        with torch.no_grad():
+            pairs, values = network.select_action(data)
+            ret = [{"index": v.argmax().item(), "A": p[0], "B": p[1]} for p, v in zip(pairs, values)]
+
+        return json.dumps(ret)
+    else:
+        return "Use the PUT method"
+
+
 @app.route('/backwards', methods=['GET', 'PUT'])
 def backwards():
     if request.method == "PUT":
