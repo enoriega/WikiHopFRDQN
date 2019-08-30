@@ -39,19 +39,16 @@ class DQN(nn.Module):
 
         return values
 
-    def backprop(self, data):
+    def backprop(self, data, gamma=0.9):
 
         # Parse the data
         states, actions, rewards, next_states = zip(*(d.values() for d in data))
         action_values = self(states)
         # The next_action_values computation is tricky, as it involves looking at many possible states
-        # TODO: Implement correctly next_action_values
-        # next_action_values = action_values.clone().detach()
         with torch.no_grad():
             pairs, next_action_values = self.select_action(next_states)
 
-        GAMMA = 0.9 # TODO parameterize this
-        updates = [r + GAMMA*q.max() for r, q in zip(rewards, next_action_values.detach())]
+        updates = [r + gamma*q.max() for r, q in zip(rewards, next_action_values.detach())]
 
         target_values = action_values.clone().detach()
 
