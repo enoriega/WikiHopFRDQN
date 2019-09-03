@@ -18,7 +18,7 @@ embeddings_cfg = cfg['embeddings']
 glove_path = embeddings_cfg['glove_path']
 voc_path = embeddings_cfg['voc_path']
 
-model_dir = "."  # TODO Parameterize this
+model_dir = cfg['model_dir']
 
 helper = EmbeddingsHelper(glove_path, voc_path)
 
