@@ -1,3 +1,4 @@
+import os
 import json
 import torch
 import yaml
@@ -16,6 +17,8 @@ embeddings_cfg = cfg['embeddings']
 
 glove_path = embeddings_cfg['glove_path']
 voc_path = embeddings_cfg['voc_path']
+
+model_dir = "."  # TODO Parameterize this
 
 helper = EmbeddingsHelper(glove_path, voc_path)
 
@@ -113,6 +116,42 @@ def distance():
 
     else:
         return "Use the PUT method"
+
+
+@app.route('/save', methods=['GET', 'POST'])
+def save():
+    if request.method == "POST":
+        model_name = request.args.get("name")
+        path = os.path.join(model_dir, model_name)
+
+        global network
+        if not network:
+            return "No model instance created yet", 503
+
+        state = network.state_dict()
+        torch.save(state, path)
+
+        return "Saved the model into %s" % model_name
+    else:
+        return "Use the POST method"
+
+
+@app.route('/load', methods=['GET', 'POST'])
+def load():
+    if request.method == "POST":
+        model_name = request.args.get("name")
+        # k = int(request.args.get("k"))
+        path = os.path.join(model_dir, model_name)
+
+        state = torch.load(path)
+        k = state['layers.0.weight'].shape[1] - helper.dimensions()*2
+        global network
+        network = DQN(k, helper)
+        network.load_state_dict(state)
+
+        return "Loaded the model from %s" % model_name
+    else:
+        return "Use the POST method"
 
 
 if __name__ == '__main__':
