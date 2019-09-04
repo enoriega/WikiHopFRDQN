@@ -60,31 +60,65 @@ class DQN(nn.Module):
 
         return loss
 
+    # def select_action(self, data):
+    #
+    #     ret_tensors = list()
+    #     ret_pairs = list()
+    #
+    #     for d in data:
+    #         # First, compute cartesian product of the candidate entities
+    #         candidate_entities = d['candidates']
+    #         candidate_pairs = list(it.product(candidate_entities, candidate_entities))
+    #         inputs = [{'features': d['features'], 'A': a, 'B': b} for a, b in candidate_pairs]
+    #         action_values = self(inputs)
+    #         # Get the index of the row with the max value
+    #         max_val = float("-inf")
+    #         row_ix = 0
+    #         row_vals = None
+    #
+    #         for ix, row in enumerate(action_values):
+    #             row_max = row.max()
+    #             if row_max > max_val:
+    #                 max_val = row_max
+    #                 row_ix = ix
+    #                 row_vals = row
+    #
+    #         ret_tensors.append(row_vals)
+    #         ret_pairs.append(candidate_pairs[row_ix])
+    #
+    #     return ret_pairs, torch.cat(ret_tensors).view((len(ret_tensors), -1))
+
     def select_action(self, data):
 
         ret_tensors = list()
         ret_pairs = list()
 
-        for d in data:
+        all_inputs = list()
+        instance_indices = list()
+        instance_candidate_pairs = list()
+
+        for ix, d in enumerate(data):
             # First, compute cartesian product of the candidate entities
             candidate_entities = d['candidates']
             candidate_pairs = list(it.product(candidate_entities, candidate_entities))
             inputs = [{'features': d['features'], 'A': a, 'B': b} for a, b in candidate_pairs]
-            action_values = self(inputs)
-            # Get the index of the row with the max value
-            max_val = float("-inf")
-            row_ix = 0
-            row_vals = None
 
-            for ix, row in enumerate(action_values):
-                row_max = row.max()
-                if row_max > max_val:
-                    max_val = row_max
-                    row_ix = ix
-                    row_vals = row
+            instance_candidate_pairs.append(candidate_pairs)
+            all_inputs.extend(inputs)
+            instance_indices.extend(it.repeat(ix, len(inputs)))
 
-            ret_tensors.append(row_vals)
-            ret_pairs.append(candidate_pairs[row_ix])
+        action_values = self(all_inputs)
+
+        # Create slice views of the tensors
+        groups = it.groupby(enumerate(instance_indices), lambda t: t[1])
+        for instance_num, g in groups:
+            indices = [t[0] for t in g]
+            tensor_slice = action_values[indices, :]
+            # Compute the row with the highest index
+            row_ix = tensor_slice.max(dim=1).values.argmax()
+            row = tensor_slice[row_ix, :]
+            ret_tensors.append(row)
+            ret_pairs.append(instance_candidate_pairs[instance_num][row_ix])
 
         return ret_pairs, torch.cat(ret_tensors).view((len(ret_tensors), -1))
 
