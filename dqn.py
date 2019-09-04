@@ -22,11 +22,8 @@ class DQN(nn.Module):
         # Layers of the network
         self.layers = nn.Sequential(
             nn.Linear(k, 20),
-            nn.ReLU(),
-            nn.Linear(20, 10),
-            nn.ReLU(),
-            nn.Linear(10, 2),
-            nn.LogSoftmax(dim=1)
+            nn.Tanh(),
+            nn.Linear(20, 2),
         )
 
     def forward(self, data):
@@ -42,6 +39,7 @@ class DQN(nn.Module):
     def backprop(self, data, gamma=0.9):
 
         # Parse the data
+        data = [d for d in data if len(d['new_state']['candidates']) > 0]
         states, actions, rewards, next_states = zip(*(d.values() for d in data))
         action_values = self(states)
         # The next_action_values computation is tricky, as it involves looking at many possible states
