@@ -60,34 +60,6 @@ class DQN(nn.Module):
 
         return loss
 
-    # def select_action(self, data):
-    #
-    #     ret_tensors = list()
-    #     ret_pairs = list()
-    #
-    #     for d in data:
-    #         # First, compute cartesian product of the candidate entities
-    #         candidate_entities = d['candidates']
-    #         candidate_pairs = list(it.product(candidate_entities, candidate_entities))
-    #         inputs = [{'features': d['features'], 'A': a, 'B': b} for a, b in candidate_pairs]
-    #         action_values = self(inputs)
-    #         # Get the index of the row with the max value
-    #         max_val = float("-inf")
-    #         row_ix = 0
-    #         row_vals = None
-    #
-    #         for ix, row in enumerate(action_values):
-    #             row_max = row.max()
-    #             if row_max > max_val:
-    #                 max_val = row_max
-    #                 row_ix = ix
-    #                 row_vals = row
-    #
-    #         ret_tensors.append(row_vals)
-    #         ret_pairs.append(candidate_pairs[row_ix])
-    #
-    #     return ret_pairs, torch.cat(ret_tensors).view((len(ret_tensors), -1))
-
     def select_action(self, data):
 
         ret_tensors = list()
@@ -126,6 +98,8 @@ class DQN(nn.Module):
         # Convert the raw data to tensor form
         batch = list()
 
+        sorted_features = list(sorted(data[0]['features']))
+
         # Create an input vector for each of the elements in data
         for datum in data:
             # Get the raw input
@@ -138,7 +112,7 @@ class DQN(nn.Module):
             eb = self.e_helper.aggregated_embedding(entity_b)
 
             # Build a vector out of the numerical features, sorted by feature name
-            f = [features[k] for k in sorted(features)]
+            f = [features[k] for k in sorted_features]
             f = torch.FloatTensor(f).to(device=self.device)
 
             # Concatenate them into a single input vector for this instance

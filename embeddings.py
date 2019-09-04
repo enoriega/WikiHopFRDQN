@@ -20,6 +20,7 @@ class EmbeddingsHelper:
             self.pretrained_embeddings = self.pretrained_embeddings.cuda()
             self.fresh_embeddings = self.fresh_embeddings.cuda()
 
+        self.index_cache = dict()
 
     @staticmethod
     def load_embeddings_from_file(data_path, voc_path):
@@ -64,21 +65,39 @@ class EmbeddingsHelper:
             return ''.join(c for c in w if ("a" <= c <= "z") or c == "_")
 
     def index(self, word):
-        sanitized = EmbeddingsHelper.sanitize_word(word)
-        if sanitized in self.existing_terms:
-            return True, self.existing_terms[sanitized]
-        else:
-            if sanitized in self.missing_terms:
-                return False, self.missing_terms[sanitized]
+        if word not in self.index_cache:
+            sanitized = EmbeddingsHelper.sanitize_word(word)
+            if sanitized in self.existing_terms:
+                location, ix = True, self.existing_terms[sanitized]
             else:
-                return False, self.missing_terms["OOV"]
-
-    def __getitem__(self, word):
-        is_pretrained, ix = self.index(word)
-        if is_pretrained:
-            return self.pretrained_embeddings(torch.LongTensor([ix]).to(self.device)).float()
+                if sanitized in self.missing_terms:
+                    location, ix = False, self.missing_terms[sanitized]
+                else:
+                    location, ix = False, self.missing_terms["OOV"]
+            self.index_cache[word] = (location, ix)
+            return location, ix
         else:
-            return self.fresh_embeddings(torch.LongTensor([ix]).to(self.device)).float()
+            return self.index_cache[word]
+
+    def __getitem__(self, words):
+
+        if type(words) == str:
+            return self[[words]][0]
+        else:
+            pretrained_indices = list()
+            fresh_indices = list()
+
+            for word in words:
+                is_pretrained, ix = self.index(word)
+                if is_pretrained:
+                    pretrained_indices.append(ix)
+                else:
+                    fresh_indices.append(ix)
+
+            pretrained = self.pretrained_embeddings(torch.LongTensor(pretrained_indices).to(self.device)).float()
+            fresh = self.fresh_embeddings(torch.LongTensor(fresh_indices).to(self.device)).float()
+
+            return torch.cat([pretrained, fresh], dim=0)
 
     def __len__(self):
         return len(self.existing_terms)
@@ -87,7 +106,7 @@ class EmbeddingsHelper:
         return self.matrix.shape[1]
 
     def aggregated_embedding(self, tokens):
-        embs_a = [self[a] for a in tokens]
+        embs_a = self[tokens]
         return EmbeddingsHelper.aggregate_embeddings(embs_a)
 
     @staticmethod
