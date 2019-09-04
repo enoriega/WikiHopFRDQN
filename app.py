@@ -42,6 +42,8 @@ def forward():
         if not network:
             k = len(data[0]['features'])
             network = DQN(k, helper)
+            if torch.cuda.is_available():
+                network = network.cuda()
 
         # Don't need to hold to the gradient here
         with torch.no_grad():
@@ -64,6 +66,8 @@ def select_action():
         if not network:
             k = len(data[0]['features'])
             network = DQN(k, helper)
+            if torch.cuda.is_available():
+                network = network.cuda()
 
         # Don't need to hold to the gradient here
         with torch.no_grad():
@@ -83,6 +87,8 @@ def backwards():
         if not network:
             k = len(data[0]['state']['features'])
             network = DQN(k, helper)
+            if torch.cuda.is_available():
+                network = network.cuda()
 
         global trainer
         if not trainer:
@@ -148,6 +154,8 @@ def load():
         global network
         network = DQN(k, helper)
         network.load_state_dict(state)
+        if torch.cuda.is_available():
+            network = network.cuda()
 
         return "Loaded the model from %s" % model_name
     else:

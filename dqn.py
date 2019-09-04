@@ -11,6 +11,8 @@ class DQN(nn.Module):
     def __init__(self, num_feats, embeddings_helper):
         super().__init__()
 
+        self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+
         # Store the helper to use it on the forward method
         self.e_helper = embeddings_helper
         # This is necessary for the instance to recognize the embeddings as parameters of the network
@@ -103,7 +105,7 @@ class DQN(nn.Module):
 
             # Build a vector out of the numerical features, sorted by feature name
             f = [features[k] for k in sorted(features)]
-            f = torch.FloatTensor(f)
+            f = torch.FloatTensor(f).to(device=self.device)
 
             # Concatenate them into a single input vector for this instance
             f = torch.cat([f, ea, eb])

@@ -10,8 +10,10 @@ class EmbeddingsHelper:
         self.matrix, self.existing_terms, self.missing_terms = self.load_embeddings_from_file(
             data_path, voc_path)
 
-        self.pretrained_embeddings = nn.Embedding.from_pretrained(torch.from_numpy(self.matrix), freeze=False)
-        self.fresh_embeddings = nn.Embedding(len(self.missing_terms), self.dimensions())
+        self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+
+        self.pretrained_embeddings = nn.Embedding.from_pretrained(torch.from_numpy(self.matrix), freeze=False).cuda()
+        self.fresh_embeddings = nn.Embedding(len(self.missing_terms), self.dimensions()).cuda()
 
     @staticmethod
     def load_embeddings_from_file(data_path, voc_path):
@@ -68,9 +70,9 @@ class EmbeddingsHelper:
     def __getitem__(self, word):
         is_pretrained, ix = self.index(word)
         if is_pretrained:
-            return self.pretrained_embeddings(torch.LongTensor([ix])).float()
+            return self.pretrained_embeddings(torch.LongTensor([ix]).to(self.device)).float()
         else:
-            return self.fresh_embeddings(torch.LongTensor([ix])).float()
+            return self.fresh_embeddings(torch.LongTensor([ix]).to(self.device)).float()
 
     def __len__(self):
         return len(self.existing_terms)
