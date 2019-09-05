@@ -162,5 +162,16 @@ def load():
         return "Use the POST method"
 
 
+@app.route('/reset', methods=['GET'])
+def reset():
+    global network, trainer, helper
+    network = None
+    trainer = None
+
+    helper = EmbeddingsHelper(glove_path, voc_path)
+
+    return "Reset the parameters"
+
+
 if __name__ == '__main__':
     app.run()
