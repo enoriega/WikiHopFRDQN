@@ -5,6 +5,7 @@ import yaml
 import torch.optim as optim
 from flask import Flask, request
 
+import dqn
 from dqn import DQN
 from embeddings import EmbeddingsHelper
 
@@ -85,7 +86,8 @@ def backwards():
         data = json.loads(request.data)
         global network
         if not network:
-            k = len(data[0]['state']['features'])
+            new_state, _ = dqn.rename_me(data[0]['new_state'])
+            k = len(new_state[0]['features'])
             network = DQN(k, helper)
             if torch.cuda.is_available():
                 network = network.cuda()

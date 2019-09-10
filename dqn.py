@@ -6,6 +6,35 @@ from torch import nn
 
 
 # noinspection PyArgumentList
+def rename_me(datum):
+    # First, compute cartesian product of the candidate entities
+    candidate_entities = [frozenset(e) for e in  datum['candidates']]
+
+    ranks, iteration_introductions, entity_usage = {}, {}, {}
+    for ix, e in enumerate(candidate_entities):
+        ranks[e] = datum['ranks'][ix]
+        iteration_introductions[e] = datum['iterationsOfIntroduction'][ix]
+        entity_usage[e] = datum['entityUsage'][ix]
+
+    candidate_pairs = list(it.product(candidate_entities, candidate_entities))
+    features = datum['features']
+
+    inputs = []
+    for a, b in candidate_pairs:
+        new_features = {
+            'log_count_a': entity_usage[a],
+            'log_count_b': entity_usage[b],
+            'intro_a': iteration_introductions[a],
+            'intro_b': iteration_introductions[b],
+            'rank_a': ranks[a],
+            'rank_b': ranks[b],
+        }
+
+        inputs.append({'features': {**features, **new_features}, 'A': a, 'B': b})
+
+    return inputs, candidate_pairs
+
+
 class DQN(nn.Module):
 
     def __init__(self, num_feats, embeddings_helper):
@@ -70,11 +99,7 @@ class DQN(nn.Module):
         instance_candidate_pairs = list()
 
         for ix, d in enumerate(data):
-            # First, compute cartesian product of the candidate entities
-            candidate_entities = d['candidates']
-            candidate_pairs = list(it.product(candidate_entities, candidate_entities))
-            inputs = [{'features': d['features'], 'A': a, 'B': b} for a, b in candidate_pairs]
-
+            inputs, candidate_pairs = rename_me(d)
             instance_candidate_pairs.append(candidate_pairs)
             all_inputs.extend(inputs)
             instance_indices.extend(it.repeat(ix, len(inputs)))
