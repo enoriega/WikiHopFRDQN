@@ -65,7 +65,8 @@ def select_action():
         # This is necessary to compute the number features dynamically
         global network
         if not network:
-            k = len(data[0]['features'])
+            new_state, _ = dqn.rename_me(data[0])
+            k = len(new_state[0]['features'])
             network = DQN(k, helper)
             if torch.cuda.is_available():
                 network = network.cuda()
