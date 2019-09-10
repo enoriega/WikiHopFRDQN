@@ -73,7 +73,7 @@ def select_action():
         # Don't need to hold to the gradient here
         with torch.no_grad():
             pairs, values = network.select_action(data)
-            ret = [{"index": v.argmax().item(), "A": p[0], "B": p[1]} for p, v in zip(pairs, values)]
+            ret = [{"index": v.argmax().item(), "A": list(p[0]), "B": list(p[1])} for p, v in zip(pairs, values)]
 
         return json.dumps(ret)
     else:
