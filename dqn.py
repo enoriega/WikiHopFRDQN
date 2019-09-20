@@ -35,9 +35,18 @@ def rename_me(datum):
     return inputs, candidate_pairs
 
 
+def zero_init(m):
+    """Initializes the parameters of a module to Zero"""
+
+    # Right now it considers only the parameters of a linear module
+    if type(m) == nn.Linear:
+        m.weight.data.fill_(0.)
+        m.bias.data.fill_(0.)
+
+
 class DQN(nn.Module):
 
-    def __init__(self, num_feats, embeddings_helper):
+    def __init__(self, num_feats, embeddings_helper, zero_init_params=False):
         super().__init__()
 
         self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -56,6 +65,9 @@ class DQN(nn.Module):
             nn.Tanh(),
             nn.Linear(20, 2),
         )
+
+        if zero_init_params:
+            self.layers.apply(zero_init)
 
     def forward(self, data):
 

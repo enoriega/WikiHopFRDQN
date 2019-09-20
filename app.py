@@ -25,6 +25,18 @@ helper = EmbeddingsHelper(glove_path, voc_path)
 
 network = None
 trainer = None
+zero_init = False
+
+
+@app.before_request
+def before_req():
+    if 'zero_init' in request.args:
+        global zero_init
+        val = request.args.get('zero_init')
+        if val.lower() == 'true':
+            zero_init = True
+        elif val.lower() == 'false':
+            zero_init = False
 
 
 @app.route('/')
@@ -42,7 +54,7 @@ def forward():
         global network
         if not network:
             k = len(data[0]['features'])
-            network = DQN(k, helper)
+            network = DQN(k, helper, zero_init_params=zero_init)
             if torch.cuda.is_available():
                 network = network.cuda()
 
@@ -67,7 +79,7 @@ def select_action():
         if not network:
             new_state, _ = dqn.rename_me(data[0])
             k = len(new_state[0]['features'])
-            network = DQN(k, helper)
+            network = DQN(k, helper, zero_init_params=zero_init)
             if torch.cuda.is_available():
                 network = network.cuda()
 
@@ -89,7 +101,7 @@ def backwards():
         if not network:
             new_state, _ = dqn.rename_me(data[0]['new_state'])
             k = len(new_state[0]['features'])
-            network = DQN(k, helper)
+            network = DQN(k, helper, zero_init_params=zero_init)
             if torch.cuda.is_available():
                 network = network.cuda()
 
@@ -155,7 +167,7 @@ def load():
         state = torch.load(path)
         k = state['layers.0.weight'].shape[1] - helper.dimensions()*2
         global network
-        network = DQN(k, helper)
+        network = DQN(k, helper, zero_init_params=zero_init)
         network.load_state_dict(state)
         if torch.cuda.is_available():
             network = network.cuda()
