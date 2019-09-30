@@ -6,9 +6,10 @@ from torch import nn
 
 
 # noinspection PyArgumentList
-def rename_me(datum):
+def process_input_data(datum):
+    """Converts a state datum into a sequence of features ready to be passed to the network"""
     # First, compute cartesian product of the candidate entities
-    candidate_entities = [frozenset(e) for e in  datum['candidates']]
+    candidate_entities = [frozenset(e) for e in datum['candidates']]
 
     ranks, iteration_introductions, entity_usage = {}, {}, {}
     for ix, e in enumerate(candidate_entities):
@@ -111,7 +112,7 @@ class DQN(nn.Module):
         instance_candidate_pairs = list()
 
         for ix, d in enumerate(data):
-            inputs, candidate_pairs = rename_me(d)
+            inputs, candidate_pairs = process_input_data(d)
             instance_candidate_pairs.append(candidate_pairs)
             all_inputs.extend(inputs)
             instance_indices.extend(it.repeat(ix, len(inputs)))
@@ -173,3 +174,65 @@ class DQN(nn.Module):
             ret.append({"Exploration": row[0].item(), "Exploitation": row[1].item()})
 
         return ret
+
+
+class LinearQN(DQN, nn.Module):
+    """This is a linear approximator that doesn't use the embeddings at all"""
+    def __init__(self, num_feats, helper, zero_init_params=False):
+        super().__init__(num_feats, helper, zero_init_params=zero_init_params)
+
+        # Ignore the helper parameter
+
+        self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+
+        k = num_feats
+
+        # This is necessary to deregister the embeddings until I find the proper way to call the super constructor
+        del self.pretrained_embeddings
+        del self.fresh_embeddings
+
+        # Layers of the network, basically a logistic regression
+        self.layers = nn.Sequential(
+            nn.Linear(k, 2),
+            nn.Sigmoid(),
+        )
+
+        if zero_init_params:
+            self.layers.apply(zero_init)
+
+    def forward(self, data):
+
+        # Parse the input data into tensor form
+        batch = self.tensor_form(data)
+
+        # Feed the batch  through the network's layers
+        values = self.layers(batch)
+
+        return values
+
+    def tensor_form(self, data):
+        """
+            This is an overridden version that ignores the entities (doesn't fetch their embeddings)
+        """
+        # Convert the raw data to tensor form
+        batch = list()
+
+        sorted_features = list(sorted(data[0]['features']))
+
+        # Create an input vector for each of the elements in data
+        for datum in data:
+            # Get the raw input
+            features = datum['features']
+
+            # Build a vector out of the numerical features, sorted by feature name
+            f = [features[k] for k in sorted_features]
+            f = torch.FloatTensor(f).to(device=self.device)
+
+            # Store it into a list
+            batch.append(f)
+
+        # Create an input matrix from all the elements (the batch)
+        input_dim = batch[0].shape[0]
+        batch = torch.cat(batch).view((len(batch), input_dim))
+
+        return batch
