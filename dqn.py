@@ -17,7 +17,8 @@ def process_input_data(datum):
         iteration_introductions[e] = datum['iterationsOfIntroduction'][ix]
         entity_usage[e] = datum['entityUsage'][ix]
 
-    candidate_pairs = list(it.product(candidate_entities, candidate_entities))
+    # Filter out a pair if they are the same entity
+    candidate_pairs = [(a, b) for a, b in it.product(candidate_entities, candidate_entities) if a != b]
     features = datum['features']
 
     inputs = []
