@@ -178,7 +178,7 @@ def load():
         # k = int(request.args.get("k"))
         path = os.path.join(model_dir, model_name)
 
-        state = torch.load(path)
+        state = torch.load(path, map_location=torch.device('cpu'))
 
         # This logic is to distinguish between the linear approx and the NN
         keys = state.keys()
