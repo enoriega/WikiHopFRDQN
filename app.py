@@ -6,7 +6,7 @@ import torch.optim as optim
 from flask import Flask, request
 
 import dqn
-from dqn import DQN, LinearQN
+from dqn import DQN, LinearQN, MLP
 from embeddings import EmbeddingsHelper
 
 app = Flask(__name__)
@@ -47,6 +47,8 @@ def configuration_hook():
             Approximator = LinearQN
         elif val.lower() == 'dqn':
             Approximator = DQN
+        elif val.lower() == 'mlp':
+            Approximator = MLP
         else:
             raise NotImplementedError("Approximator %s not implemented" % val)
 
@@ -92,7 +94,7 @@ def select_action():
         if not network:
             new_state, _ = dqn.process_input_data(data[0])
             k = len(new_state[0]['features'])
-            network = Approximator(k, helper, zero_init_params=zero_init)
+            network = Approximator(k, helper, zero_init)
             if torch.cuda.is_available():
                 network = network.cuda()
 

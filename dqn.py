@@ -1,4 +1,5 @@
 import itertools as it
+from abc import abstractmethod
 
 import torch
 import torch.nn.functional as F
@@ -46,40 +47,22 @@ def zero_init(m):
         m.bias.data.fill_(0.)
 
 
-class DQN(nn.Module):
-
-    def __init__(self, num_feats, embeddings_helper, zero_init_params=False):
+class BaseApproximator(nn.Module):
+    def __init__(self, num_feats, zero_init_params=False):
         super().__init__()
+
+        self.num_feats = num_feats
 
         self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
-        # Store the helper to use it on the forward method
-        self.e_helper = embeddings_helper
-        # This is necessary for the instance to recognize the embeddings as parameters of the network
-        self.pretrained_embeddings = embeddings_helper.pretrained_embeddings
-        self.fresh_embeddings = embeddings_helper.fresh_embeddings
-
-        k = num_feats + embeddings_helper.dimensions() * 2
-
-        # Layers of the network
-        self.layers = nn.Sequential(
-            nn.Linear(k, 20),
-            nn.Tanh(),
-            nn.Linear(20, 2),
-        )
+        self.layers = self.build_layers(num_feats)
 
         if zero_init_params:
             self.layers.apply(zero_init)
 
-    def forward(self, data):
-
-        # Parse the input data into tensor form
-        batch = self.tensor_form(data)
-
-        # Feed the batch  through the network's layers
-        values = self.layers(batch)
-
-        return values
+    @abstractmethod
+    def build_layers(self, num_feats):
+        pass
 
     def backprop(self, data, gamma=0.9):
 
@@ -133,6 +116,48 @@ class DQN(nn.Module):
 
         return ret_pairs, torch.cat(ret_tensors).view((len(ret_tensors), -1))
 
+    @staticmethod
+    def raw2json(raw_vals):
+        ret = list()
+
+        for row in raw_vals.split(1):
+            row = row.squeeze()
+            ret.append({"Exploration": row[0].item(), "Exploitation": row[1].item()})
+
+        return ret
+
+
+class DQN(BaseApproximator):
+
+    def __init__(self, num_feats, embeddings_helper, zero_init_params):
+        self.e_helper = embeddings_helper
+        super().__init__(num_feats, zero_init_params)
+        self.fresh_embeddings = embeddings_helper.fresh_embeddings
+        self.pretrained_embeddings = embeddings_helper.pretrained_embeddings
+
+    def build_layers(self, num_feats):
+        # Store the helper to use it on the forward method
+        # This is necessary for the instance to recognize the embeddings as parameters of the network
+        embeddings_helper = self.e_helper
+
+        k = num_feats + embeddings_helper.dimensions() * 2
+
+        # Layers of the network
+        return nn.Sequential(
+            nn.Linear(k, 20),
+            nn.Tanh(),
+            nn.Linear(20, 2),
+        )
+
+    def forward(self, data):
+        # Parse the input data into tensor form
+        batch = self.tensor_form(data)
+
+        # Feed the batch  through the network's layers
+        values = self.layers(batch)
+
+        return values
+
     def tensor_form(self, data):
         # Convert the raw data to tensor form
         batch = list()
@@ -166,43 +191,34 @@ class DQN(nn.Module):
 
         return batch
 
-    @staticmethod
-    def raw2json(raw_vals):
-        ret = list()
 
-        for row in raw_vals.split(1):
-            row = row.squeeze()
-            ret.append({"Exploration": row[0].item(), "Exploitation": row[1].item()})
-
-        return ret
-
-
-class LinearQN(DQN, nn.Module):
+class LinearQN(BaseApproximator):
     """This is a linear approximator that doesn't use the embeddings at all"""
-    def __init__(self, num_feats, helper, zero_init_params=False):
-        super().__init__(num_feats, helper, zero_init_params=zero_init_params)
 
-        # Ignore the helper parameter
+    def __init__(self, num_feats, helper, zero_init_params):
+        super().__init__(num_feats, zero_init_params)
 
-        self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    # def __init__(self, num_feats, helper, zero_init_params=False):
+    #     super().__init__(num_feats, zero_init_params)
+    #     # Ignore the helper parameter
+    #
+    #     self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    #
+    #     k = num_feats
+    #
+    #     # Layers of the network, basically a logistic regression
+    #     self.layers = __build_layers(num_feats)
+    #
+    #     if zero_init_params:
+    #         self.layers.apply(zero_init)
 
-        k = num_feats
-
-        # This is necessary to deregister the embeddings until I find the proper way to call the super constructor
-        del self.pretrained_embeddings
-        del self.fresh_embeddings
-
-        # Layers of the network, basically a logistic regression
-        self.layers = nn.Sequential(
-            nn.Linear(k, 2),
+    def build_layers(self, num_feats):
+        return nn.Sequential(
+            nn.Linear(num_feats, 2),
             nn.Sigmoid(),
         )
 
-        if zero_init_params:
-            self.layers.apply(zero_init)
-
     def forward(self, data):
-
         # Parse the input data into tensor form
         batch = self.tensor_form(data)
 
@@ -237,3 +253,20 @@ class LinearQN(DQN, nn.Module):
         batch = torch.cat(batch).view((len(batch), input_dim))
 
         return batch
+
+
+class MLP(LinearQN):
+    """This is a linear approximator that doesn't use the embeddings at all"""
+
+    def __init__(self, num_feats, helper, zero_init_params):
+        super().__init__(num_feats, helper, zero_init_params)
+
+    def build_layers(self, num_feats):
+        return nn.Sequential(
+            nn.Linear(num_feats, 100),
+            nn.ReLU(),
+            nn.Linear(100, 20),
+            nn.ReLU(),
+            nn.Linear(20, 2),
+            nn.Softmax(),
+        )
