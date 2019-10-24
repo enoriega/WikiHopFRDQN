@@ -67,7 +67,7 @@ class BaseApproximator(nn.Module):
     def backprop(self, data, gamma=0.9):
 
         # Parse the data
-        data = [d for d in data if len(d['new_state']['candidates']) > 0]
+        data = [d for d in data if len(set(frozenset(e) for e in d['new_state']['candidates'])) > 1]
         states, actions, rewards, next_states = zip(*(d.values() for d in data))
         action_values = self(states)
         # The next_action_values computation is tricky, as it involves looking at many possible states
