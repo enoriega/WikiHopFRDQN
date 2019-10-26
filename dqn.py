@@ -268,5 +268,5 @@ class MLP(LinearQN):
             nn.Linear(100, 20),
             nn.ReLU(),
             nn.Linear(20, 2),
-            nn.Softmax(),
+            # nn.Sigmoid(),
         )
