@@ -80,7 +80,7 @@ class BaseApproximator(nn.Module):
 
         for row_ix, action in enumerate(actions):
             col_ix = 0 if action == "exploration" else 1
-            target_values[row_ix, col_ix] = updates[row_ix]
+            target_values[row_ix, col_ix] += (updates[row_ix] - target_values[row_ix, col_ix])
 
         loss = F.mse_loss(action_values, target_values)
 
