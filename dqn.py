@@ -198,20 +198,6 @@ class LinearQN(BaseApproximator):
     def __init__(self, num_feats, helper, zero_init_params):
         super().__init__(num_feats, zero_init_params)
 
-    # def __init__(self, num_feats, helper, zero_init_params=False):
-    #     super().__init__(num_feats, zero_init_params)
-    #     # Ignore the helper parameter
-    #
-    #     self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-    #
-    #     k = num_feats
-    #
-    #     # Layers of the network, basically a logistic regression
-    #     self.layers = __build_layers(num_feats)
-    #
-    #     if zero_init_params:
-    #         self.layers.apply(zero_init)
-
     def build_layers(self, num_feats):
         return nn.Sequential(
             nn.Linear(num_feats, 2),

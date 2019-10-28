@@ -26,7 +26,7 @@ helper = EmbeddingsHelper(glove_path, voc_path)
 network = None
 trainer = None
 zero_init = False
-Approximator = DQN  # This is the default approximator class used
+Approximator = None  # This is the default approximator class used
 
 
 @app.before_request
@@ -172,38 +172,62 @@ def save():
         return "Use the POST method"
 
 
+# @app.route('/load', methods=['GET', 'POST'])
+# def load():
+#     if request.method == "POST":
+#         global network, Approximator
+#         model_name = request.args.get("name")
+#         # k = int(request.args.get("k"))
+#         path = os.path.join(model_dir, model_name)
+#
+#         state = torch.load(path, map_location=torch.device('cpu'))
+#
+#         # This logic is to distinguish between the linear approx and the NN
+#         keys = state.keys()
+#         # If any embeddings are in the params, instantiate a DQN
+#         if 'pretrained_embeddings.weight' in keys:
+#             k = state['layers.0.weight'].shape[1] - helper.dimensions()*2
+#
+#             Approximator = DQN
+#             network = DQN(k, helper, zero_init_params=zero_init)
+#             network.load_state_dict(state)
+#             if torch.cuda.is_available():
+#                 network = network.cuda()
+#             return "Loaded the DQN model from %s" % model_name
+#         # Otherwise, load a LinearQN
+#         else:
+#             k = state['layers.0.weight'].shape[1]
+#             Approximator = MLP
+#             network = Approximator(k, helper, zero_init_params=zero_init)
+#             network.load_state_dict(state)
+#             if torch.cuda.is_available():
+#                 network = network.cuda()
+#
+#             return "Loaded the linear model from %s" % model_name
+#     else:
+#         return "Use the POST method"
+
 @app.route('/load', methods=['GET', 'POST'])
 def load():
     if request.method == "POST":
         global network, Approximator
         model_name = request.args.get("name")
-        # k = int(request.args.get("k"))
         path = os.path.join(model_dir, model_name)
 
         state = torch.load(path, map_location=torch.device('cpu'))
 
-        # This logic is to distinguish between the linear approx and the NN
-        keys = state.keys()
-        # If any embeddings are in the params, instantiate a DQN
-        if 'pretrained_embeddings.weight' in keys:
-            k = state['layers.0.weight'].shape[1] - helper.dimensions()*2
-
-            Approximator = DQN
-            network = DQN(k, helper, zero_init_params=zero_init)
-            network.load_state_dict(state)
-            if torch.cuda.is_available():
-                network = network.cuda()
-            return "Loaded the DQN model from %s" % model_name
-        # Otherwise, load a LinearQN
+        if Approximator == DQN:
+            k = state['layers.0.weight'].shape[1] - helper.dimensions() * 2
         else:
             k = state['layers.0.weight'].shape[1]
-            Approximator = LinearQN
-            network = LinearQN(k, helper, zero_init_params=zero_init)
-            network.load_state_dict(state)
-            if torch.cuda.is_available():
-                network = network.cuda()
 
-            return "Loaded the linear model from %s" % model_name
+        network = Approximator(k, helper, zero_init_params=zero_init)
+        network.load_state_dict(state)
+        if torch.cuda.is_available():
+            network = network.cuda()
+
+        return "Loaded the %s model from %s" % (str(Approximator), model_name)
+
     else:
         return "Use the POST method"
 
