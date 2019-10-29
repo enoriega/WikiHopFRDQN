@@ -201,7 +201,7 @@ class LinearQN(BaseApproximator):
     def build_layers(self, num_feats):
         return nn.Sequential(
             nn.Linear(num_feats, 2),
-            nn.Sigmoid(),
+            # nn.Sigmoid(),
         )
 
     def forward(self, data):
