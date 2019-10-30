@@ -1,5 +1,5 @@
 import dqn
-from dqn import DQN, LinearQN, MLP
+from dqn import DQN, LinearQN, MLP, death_gradient
 from embeddings import EmbeddingsHelper
 import yaml
 import numpy as np

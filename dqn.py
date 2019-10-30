@@ -260,9 +260,9 @@ class MLP(LinearQN):
     def build_layers(self, num_feats):
         return nn.Sequential(
             nn.Linear(num_feats, 100),
-            nn.Tanh(),
+            nn.LeakyReLU(),
             nn.Linear(100, 20),
-            nn.Tanh(),
+            nn.LeakyReLU(),
             nn.Linear(20, 2),
             # nn.Sigmoid(),
         )

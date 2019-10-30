@@ -133,6 +133,8 @@ def backwards():
             param.grad.data.clamp_(-1, 1)
         trainer.step()
 
+        print("Death gradients: %f" % dqn.death_gradient(network.parameters()))
+
         return "Performed a back propagation step"
 
     else:
