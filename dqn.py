@@ -4,6 +4,12 @@ from abc import abstractmethod
 import torch
 import torch.nn.functional as F
 from torch import nn
+import numpy as np
+
+
+def death_gradient(parameters):
+    gradient = np.row_stack([p.grad.numpy().reshape(-1, 1) for p in parameters])
+    return np.isclose(np.zeros(gradient.shape), gradient).astype(int).sum() / float(len(gradient))
 
 
 # noinspection PyArgumentList
@@ -206,11 +212,15 @@ class LinearQN(BaseApproximator):
 
     def forward(self, data):
         # Parse the input data into tensor form
+        # TODO uncomment this
         batch = self.tensor_form(data)
 
         # Feed the batch  through the network's layers
-        values = self.layers(batch)
+        # batch = data
+        return self.forward_raw(batch)
 
+    def forward_raw(self, batch):
+        values = self.layers(batch)
         return values
 
     def tensor_form(self, data):
