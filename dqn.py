@@ -18,18 +18,21 @@ def process_input_data(datum):
     # First, compute cartesian product of the candidate entities
     candidate_entities = [frozenset(e) for e in datum['candidates']]
 
-    ranks, iteration_introductions, entity_usage = {}, {}, {}
+    ranks, iteration_introductions, entity_usage, explore_scores, exploit_scores = {}, {}, {}, {}, {}
     for ix, e in enumerate(candidate_entities):
         ranks[e] = datum['ranks'][ix]
         iteration_introductions[e] = datum['iterationsOfIntroduction'][ix]
         entity_usage[e] = datum['entityUsage'][ix]
+
+    exploit_scores = datum['exploitScores']
+    explore_scores = datum['exploreScores']
 
     # Filter out a pair if they are the same entity
     candidate_pairs = [(a, b) for a, b in it.product(candidate_entities, candidate_entities) if a != b]
     features = datum['features']
 
     inputs = []
-    for a, b in candidate_pairs:
+    for ix, (a, b) in enumerate(candidate_pairs):
         new_features = {
             'log_count_a': entity_usage[a],
             'log_count_b': entity_usage[b],
@@ -37,6 +40,8 @@ def process_input_data(datum):
             'intro_b': iteration_introductions[b],
             'rank_a': ranks[a],
             'rank_b': ranks[b],
+            'explore_score': explore_scores[ix],
+            'exploit_score': exploit_scores[ix],
         }
 
         inputs.append({'features': {**features, **new_features}, 'A': a, 'B': b})
