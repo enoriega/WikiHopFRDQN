@@ -26,6 +26,7 @@ def process_input_data(datum):
 
     exploit_scores = datum['exploitScores']
     explore_scores = datum['exploreScores']
+    same_components = datum['sameComponents']
 
     # Filter out a pair if they are the same entity
     candidate_pairs = [(a, b) for a, b in it.product(candidate_entities, candidate_entities) if a != b]
@@ -42,6 +43,7 @@ def process_input_data(datum):
             'rank_b': ranks[b],
             'explore_score': explore_scores[ix],
             'exploit_score': exploit_scores[ix],
+            'same_component': same_components[ix],
         }
 
         inputs.append({'features': {**features, **new_features}, 'A': a, 'B': b})
