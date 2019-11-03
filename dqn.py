@@ -77,7 +77,7 @@ class BaseApproximator(nn.Module):
     def build_layers(self, num_feats):
         pass
 
-    def backprop(self, data, gamma=0.9):
+    def backprop(self, data, gamma=0.9, alpha=1.0):
 
         # Parse the data
         data = [d for d in data if len(set(frozenset(e) for e in d['new_state']['candidates'])) > 1]
@@ -87,13 +87,16 @@ class BaseApproximator(nn.Module):
         with torch.no_grad():
             pairs, next_action_values = self.select_action(next_states)
 
-        updates = [r + gamma * q.max() for r, q in zip(rewards, next_action_values.detach())]
+        # updates = [r + gamma * q.max() for r, q in zip(rewards, next_action_values.detach())]
+        # This change shortcuts the update to not account for the next action state when the reward is observed, because
+        # this is when the transition was to the final state, which by definition has a value of zero
+        updates = [r if r > 0 else r + gamma * q.max() for r, q in zip(rewards, next_action_values.detach())]
 
         target_values = action_values.clone().detach()
 
         for row_ix, action in enumerate(actions):
             col_ix = 0 if action == "exploration" else 1
-            target_values[row_ix, col_ix] += (updates[row_ix] - target_values[row_ix, col_ix])
+            target_values[row_ix, col_ix] += (alpha * (updates[row_ix] - target_values[row_ix, col_ix]))
 
         loss = F.mse_loss(action_values, target_values)
 
