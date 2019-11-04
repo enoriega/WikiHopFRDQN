@@ -90,7 +90,7 @@ class BaseApproximator(nn.Module):
         # updates = [r + gamma * q.max() for r, q in zip(rewards, next_action_values.detach())]
         # This change shortcuts the update to not account for the next action state when the reward is observed, because
         # this is when the transition was to the final state, which by definition has a value of zero
-        updates = [r if r > 0 else r + gamma * q.max() for r, q in zip(rewards, next_action_values.detach())]
+        updates = [r if r != 0 else r + gamma * q.max() for r, q in zip(rewards, next_action_values.detach())]
 
         target_values = action_values.clone().detach()
 
