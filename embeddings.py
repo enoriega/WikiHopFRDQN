@@ -6,13 +6,13 @@ from torch import nn
 
 class EmbeddingsHelper:
 
-    def __init__(self, data_path, voc_path):
+    def __init__(self, data_path, voc_path, freeze=False):
         self.matrix, self.existing_terms, self.missing_terms = self.load_embeddings_from_file(
             data_path, voc_path)
 
         self.device = torch.device("cpu")
 
-        self.pretrained_embeddings = nn.Embedding.from_pretrained(torch.from_numpy(self.matrix), freeze=False)
+        self.pretrained_embeddings = nn.Embedding.from_pretrained(torch.from_numpy(self.matrix), freeze=freeze)
         self.fresh_embeddings = nn.Embedding(len(self.missing_terms), self.dimensions())
 
         if torch.cuda.is_available():

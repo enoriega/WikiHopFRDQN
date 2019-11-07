@@ -18,10 +18,11 @@ embeddings_cfg = cfg['embeddings']
 
 glove_path = embeddings_cfg['glove_path']
 voc_path = embeddings_cfg['voc_path']
+freeze_embeddings = embeddings_cfg['freeze']
 
 model_dir = cfg['model_dir']
 
-helper = EmbeddingsHelper(glove_path, voc_path)
+helper = EmbeddingsHelper(glove_path, voc_path, freeze_embeddings)
 
 network = None
 trainer = None
