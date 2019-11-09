@@ -201,6 +201,7 @@ class BQN(BaseApproximator):
         pooled_vectors = list()
         for ids, types in zip(bert_ids, bert_types):
             last_hidden_state, _ = self.bert(ids, token_type_ids=types)
+            del _
             cls_h = last_hidden_state[0, 0, :]
             pooled_vectors.append(cls_h)
 
@@ -208,6 +209,8 @@ class BQN(BaseApproximator):
         matrix = torch.cat([feature_matrix, pooled_vectors], dim=1)
         # Feed the batch  through the network's layers
         values = self.layers(matrix)
+
+        del bert_ids, bert_types, feature_matrix, pooled_vectors, matrix
 
         return values
 

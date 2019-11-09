@@ -140,6 +140,9 @@ def backwards():
                 param.grad.data.clamp_(-1, 1)
         trainer.step()
 
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
         # print("Death gradients: %f" % dqn.death_gradient(network.parameters()))
 
         return "Performed a back propagation step"
