@@ -209,7 +209,7 @@ class BQN(BaseApproximator):
                           eb_tokens + \
                           ['[SEP]']
 
-            bert_token_types = torch.tensor([[0] * (len(ea_tokens) + 2) + [1] * (len(eb_tokens) + 1)])
+            bert_token_types = torch.tensor([[0] * (len(ea_tokens) + 2) + [1] * (len(eb_tokens) + 1)]).to(device=self.device)
             batch_types.append(bert_token_types)
 
             bert_ids = torch.tensor([tokenizer.convert_tokens_to_ids(bert_tokens)]).to(device=self.device)
