@@ -103,6 +103,33 @@ class BaseApproximator(nn.Module):
 
         return loss
 
+    def backprop2(self, data, gamma=0.9, alpha=1.0):
+
+        cpu = torch.device("cpu")
+
+        # Parse the data
+        data = [d for d in data if len(set(frozenset(e) for e in d['new_state']['candidates'])) > 1]
+        states, actions, rewards, next_states = zip(*(d.values() for d in data))
+        action_values = self(states)
+        # The next_action_values computation is tricky, as it involves looking at many possible states
+        with torch.no_grad():
+            pairs, next_action_values = self.select_action(next_states)
+            next_action_values = next_action_values.detach().to(cpu)
+            max_vals, max_vals_ix = next_action_values.max(dim=1)
+
+        # This change shortcuts the update to not account for the next action state when the reward is observed, because
+        # this is when the transition was to the final state, which by definition has a value of zero
+        updates = torch.tensor([r if r != 0 else r + gamma * q for r, q in zip(rewards, max_vals)]).to(cpu)
+
+        target_values = action_values.clone().detach().to(cpu)
+
+        col_ixs = [0 if action == "exploration" else 1 for action in actions]
+        target_values[:, col_ixs] += (alpha * (updates - target_values[:, col_ixs]))
+
+        loss = F.mse_loss(action_values, target_values.to(self.device))
+
+        return loss
+
     def select_action(self, data):
 
         ret_tensors = list()

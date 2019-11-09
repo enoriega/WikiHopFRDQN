@@ -130,7 +130,7 @@ def backwards():
             trainer = optim.RMSprop(network.parameters())
 
         network.train()
-        loss = network.backprop(data)
+        loss = network.backprop2(data)
 
         # Optimize the model
         trainer.zero_grad()
