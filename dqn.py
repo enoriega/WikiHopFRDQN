@@ -5,10 +5,11 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 import numpy as np
+from transformers import *
 
 
 def death_gradient(parameters):
-    gradient = np.row_stack([p.grad.numpy().reshape(-1, 1) for p in parameters])
+    gradient = np.row_stack([p.grad.numpy().reshape(-1, 1) for p in parameters if p.grad is not None])
     return np.isclose(np.zeros(gradient.shape), gradient).astype(int).sum() / float(len(gradient))
 
 
@@ -141,6 +142,94 @@ class BaseApproximator(nn.Module):
             ret.append({"Exploration": row[0].item(), "Exploitation": row[1].item()})
 
         return ret
+
+
+class BQN(BaseApproximator):
+    """ This approximator user BERT instead of embeddings """
+
+    def build_layers(self, num_feats):
+        # Store the helper to use it on the forward method
+        # This is necessary for the instance to recognize the embeddings as parameters of the network
+
+        config = BertConfig.from_pretrained('bert-base-uncased')
+        k = num_feats + config.hidden_size
+
+        # Layers of the network
+        return nn.Sequential(
+            nn.Linear(k, 20),
+            nn.Tanh(),
+            nn.Linear(20, 2),
+        )
+
+    def __init__(self, num_feats, helper, zero_init_params):
+        super().__init__(num_feats, zero_init_params)
+        self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        self.bert = BertModel.from_pretrained('bert-base-uncased')
+
+    def forward(self, data):
+        # Parse the input data into tensor form
+        bert_ids, bert_types, feature_matrix = self.tensor_form(data)
+
+        # Retrieve the un-processed pooler outputs from the last hidden states
+        pooled_vectors = list()
+        for ids, types in zip(bert_ids, bert_types):
+            last_hidden_state, _ = self.bert(ids, token_type_ids=types)
+            cls_h = last_hidden_state[0, 0, :]
+            pooled_vectors.append(cls_h)
+
+        pooled_vectors = torch.stack(pooled_vectors)
+        matrix = torch.cat([feature_matrix, pooled_vectors], dim=1)
+        # Feed the batch  through the network's layers
+        values = self.layers(matrix)
+
+        return values
+
+    def tensor_form(self, data):
+        # Convert the raw data to tensor form
+        batch_ids, batch_types, batch_features = list(), list(), list()
+
+        tokenizer = self.tokenizer
+        sorted_features = list(sorted(data[0]['features']))
+
+        # Create an input vector for each of the elements in data
+        for datum in data:
+            # Get the raw input
+            features = datum['features']
+            entity_a = datum['A']
+            entity_b = datum['B']
+
+            # Put together the entity pair as a sequence for BERT's
+
+            ea_tokens = list(it.chain.from_iterable(tokenizer.tokenize(t) for t in sorted(entity_a)))
+            eb_tokens = list(it.chain.from_iterable(tokenizer.tokenize(t) for t in sorted(entity_b)))
+
+            bert_tokens = ['[CLS]'] + \
+                          ea_tokens + \
+                          ['[SEP]'] + \
+                          eb_tokens + \
+                          ['[SEP]']
+
+            bert_token_types = torch.tensor([[0] * (len(ea_tokens) + 2) + [1] * (len(eb_tokens) + 1)])
+            batch_types.append(bert_token_types)
+
+            bert_ids = torch.tensor([tokenizer.convert_tokens_to_ids(bert_tokens)]).to(device=self.device)
+
+            # Build a vector out of the numerical features, sorted by feature name
+            f = [features[k] for k in sorted_features]
+            f = torch.FloatTensor(f).to(device=self.device)
+
+            # Concatenate them into a single input vector for this instance
+            batch_ids.append(bert_ids)
+            batch_features.append(f)
+
+        # Create an input matrix from all the elements (the batch)
+        num_features = batch_features[0].shape[0]
+        # batch = torch.cat(batch).view((len(batch), input_dim))
+        bert_inputs = batch_ids
+        bert_types = batch_types
+        feature_matrix = torch.cat(batch_features).view(len(batch_features), num_features)
+
+        return bert_inputs, bert_types, feature_matrix
 
 
 class DQN(BaseApproximator):

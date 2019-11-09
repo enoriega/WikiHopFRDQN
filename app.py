@@ -4,9 +4,10 @@ import torch
 import yaml
 import torch.optim as optim
 from flask import Flask, request
+from transformers import BertConfig
 
 import dqn
-from dqn import DQN, LinearQN, MLP
+from dqn import DQN, LinearQN, MLP, BQN
 from embeddings import EmbeddingsHelper
 
 app = Flask(__name__)
@@ -50,6 +51,8 @@ def configuration_hook():
             Approximator = DQN
         elif val.lower() == 'mlp':
             Approximator = MLP
+        elif val.lower() == 'bqn':
+            Approximator = BQN
         else:
             raise NotImplementedError("Approximator %s not implemented" % val)
 
@@ -101,6 +104,7 @@ def select_action():
 
         # Don't need to hold to the gradient here
         with torch.no_grad():
+            network.eval()
             pairs, values = network.select_action(data)
             ret = [{"index": v.argmax().item(), "A": list(p[0]), "B": list(p[1])} for p, v in zip(pairs, values)]
 
@@ -125,16 +129,18 @@ def backwards():
         if not trainer:
             trainer = optim.RMSprop(network.parameters())
 
+        network.train()
         loss = network.backprop(data)
 
         # Optimize the model
         trainer.zero_grad()
         loss.backward()
         for param in network.parameters():
-            param.grad.data.clamp_(-1, 1)
+            if param.grad is not None:
+                param.grad.data.clamp_(-1, 1)
         trainer.step()
 
-        print("Death gradients: %f" % dqn.death_gradient(network.parameters()))
+        # print("Death gradients: %f" % dqn.death_gradient(network.parameters()))
 
         return "Performed a back propagation step"
 
@@ -186,6 +192,8 @@ def load():
 
         if Approximator == DQN:
             k = state['layers.0.weight'].shape[1] - helper.dimensions() * 2
+        elif Approximator == BQN:
+            k = state['layers.0.weight'].shape[1] - BertConfig.from_pretrained('bert-base-uncased').hidden_size
         else:
             k = state['layers.0.weight'].shape[1]
 

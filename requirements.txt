@@ -1,3 +1,4 @@
+transformers
 PyYAML
 torch
 altgraph==0.16.1
