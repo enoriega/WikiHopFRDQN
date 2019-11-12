@@ -78,7 +78,7 @@ class BaseApproximator(nn.Module):
     def build_layers(self, num_feats):
         pass
 
-    def backprop(self, data, gamma=0.9, alpha=1.0):
+    def backprop_old(self, data, gamma=0.9, alpha=1.0):
 
         # Parse the data
         data = [d for d in data if len(set(frozenset(e) for e in d['new_state']['candidates'])) > 1]
@@ -119,7 +119,7 @@ class BaseApproximator(nn.Module):
 
         # This change shortcuts the update to not account for the next action state when the reward is observed, because
         # this is when the transition was to the final state, which by definition has a value of zero
-        updates = torch.tensor([r if r != 0 else r + gamma * q for r, q in zip(rewards, max_vals)]).to(cpu)
+        updates = torch.tensor([r if r != 0 else r + gamma * q for r, q in zip(rewards, max_vals)], device=cpu)
 
         target_values = action_values.clone().detach().to(cpu)
 
@@ -130,7 +130,7 @@ class BaseApproximator(nn.Module):
 
         return loss
 
-    def select_action(self, data):
+    def select_action_old(self, data):
 
         ret_tensors = list()
         ret_pairs = list()
@@ -157,6 +157,38 @@ class BaseApproximator(nn.Module):
             row = tensor_slice[row_ix, :]
             ret_tensors.append(row)
             ret_pairs.append(instance_candidate_pairs[instance_num][row_ix])
+
+        return ret_pairs, torch.cat(ret_tensors).view((len(ret_tensors), -1))
+
+    def select_action(self, data):
+
+        cpu = torch.device("cpu")
+        ret_tensors = list()
+        ret_pairs = list()
+
+        all_inputs = list()
+        instance_indices = list()
+        instance_candidate_pairs = list()
+
+        for ix, d in enumerate(data):
+            inputs, candidate_pairs = process_input_data(d)
+            instance_candidate_pairs.append(candidate_pairs)
+            all_inputs.extend(inputs)
+            instance_indices.extend(it.repeat(ix, len(inputs)))
+
+        action_values = self(all_inputs).detach().to(cpu)
+        _, max_vals_ixs = action_values.max(dim=1)
+
+        # Create slice views of the tensors
+        groups = it.groupby(enumerate(instance_indices), lambda t: t[1])
+        for instance_num, g in groups:
+            indices = [t[0] for t in g]
+            tensor_slice = action_values[indices, :]
+            row_ix = max_vals_ixs[indices].argmax()
+            # Compute the row with the highest index
+            row = tensor_slice[row_ix, :]
+            ret_tensors.append(row)
+            ret_pairs.append(instance_candidate_pairs[instance_num][row.argmax().item()])
 
         return ret_pairs, torch.cat(ret_tensors).view((len(ret_tensors), -1))
 
@@ -239,14 +271,14 @@ class BQN(BaseApproximator):
                           eb_tokens + \
                           ['[SEP]']
 
-            bert_token_types = torch.tensor([[0] * (len(ea_tokens) + 2) + [1] * (len(eb_tokens) + 1)]).to(device=self.device)
+            bert_token_types = torch.tensor([[0] * (len(ea_tokens) + 2) + [1] * (len(eb_tokens) + 1)], device=self.device)
             batch_types.append(bert_token_types)
 
-            bert_ids = torch.tensor([tokenizer.convert_tokens_to_ids(bert_tokens)]).to(device=self.device)
+            bert_ids = torch.tensor([tokenizer.convert_tokens_to_ids(bert_tokens)], device=self.device)
 
             # Build a vector out of the numerical features, sorted by feature name
             f = [features[k] for k in sorted_features]
-            f = torch.FloatTensor(f).to(device=self.device)
+            f = torch.FloatTensor(f, device=self.device)
 
             # Concatenate them into a single input vector for this instance
             batch_ids.append(bert_ids)
@@ -312,7 +344,7 @@ class DQN(BaseApproximator):
 
             # Build a vector out of the numerical features, sorted by feature name
             f = [features[k] for k in sorted_features]
-            f = torch.FloatTensor(f).to(device=self.device)
+            f = torch.FloatTensor(f, device=self.device)
 
             # Concatenate them into a single input vector for this instance
             f = torch.cat([f, ea, eb])
@@ -368,7 +400,7 @@ class LinearQN(BaseApproximator):
 
             # Build a vector out of the numerical features, sorted by feature name
             f = [features[k] for k in sorted_features]
-            f = torch.FloatTensor(f).to(device=self.device)
+            f = torch.FloatTensor(f, device=self.device)
 
             # Store it into a list
             batch.append(f)
