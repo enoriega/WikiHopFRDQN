@@ -301,6 +301,7 @@ class DQN(BaseApproximator):
         super().__init__(num_feats, zero_init_params)
         self.fresh_embeddings = embeddings_helper.fresh_embeddings
         self.pretrained_embeddings = embeddings_helper.pretrained_embeddings
+        self.dropout = nn.Dropout(p=0.25)
 
     def build_layers(self, num_feats):
         # Store the helper to use it on the forward method
@@ -313,6 +314,7 @@ class DQN(BaseApproximator):
         return nn.Sequential(
             nn.Linear(k, 20),
             nn.Tanh(),
+            nn.Dropout(p=0.1),
             nn.Linear(20, 2),
         )
 
@@ -339,8 +341,8 @@ class DQN(BaseApproximator):
             entity_b = datum['B']
 
             # Query the helper for the aggregated embeddings of the entities
-            ea = self.e_helper.aggregated_embedding(entity_a)
-            eb = self.e_helper.aggregated_embedding(entity_b)
+            ea = self.dropout(self.e_helper.aggregated_embedding(entity_a))
+            eb = self.dropout(self.e_helper.aggregated_embedding(entity_b))
 
             # Build a vector out of the numerical features, sorted by feature name
             f = [features[k] for k in sorted_features]
