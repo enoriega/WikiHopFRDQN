@@ -78,7 +78,7 @@ class BaseApproximator(nn.Module):
     def build_layers(self, num_feats):
         pass
 
-    def backprop_old(self, data, gamma=0.9, alpha=1.0):
+    def backprop(self, data, gamma=0.9, alpha=1.0):
 
         # Parse the data
         data = [d for d in data if len(set(frozenset(e) for e in d['new_state']['candidates'])) > 1]
@@ -103,34 +103,7 @@ class BaseApproximator(nn.Module):
 
         return loss
 
-    def backprop2(self, data, gamma=0.9, alpha=1.0):
-
-        cpu = torch.device("cpu")
-
-        # Parse the data
-        data = [d for d in data if len(set(frozenset(e) for e in d['new_state']['candidates'])) > 1]
-        states, actions, rewards, next_states = zip(*(d.values() for d in data))
-        action_values = self(states)
-        # The next_action_values computation is tricky, as it involves looking at many possible states
-        with torch.no_grad():
-            pairs, next_action_values = self.select_action(next_states)
-            next_action_values = next_action_values.detach().to(cpu)
-            max_vals, max_vals_ix = next_action_values.max(dim=1)
-
-        # This change shortcuts the update to not account for the next action state when the reward is observed, because
-        # this is when the transition was to the final state, which by definition has a value of zero
-        updates = torch.tensor([r if r != 0 else r + gamma * q for r, q in zip(rewards, max_vals)], device=cpu)
-
-        target_values = action_values.clone().detach().to(cpu)
-
-        col_ixs = [0 if action == "exploration" else 1 for action in actions]
-        target_values[:, col_ixs] += (alpha * (updates - target_values[:, col_ixs]))
-
-        loss = F.mse_loss(action_values, target_values.to(self.device))
-
-        return loss
-
-    def select_action_old(self, data):
+    def select_action(self, data):
 
         ret_tensors = list()
         ret_pairs = list()
@@ -160,37 +133,7 @@ class BaseApproximator(nn.Module):
 
         return ret_pairs, torch.cat(ret_tensors).view((len(ret_tensors), -1))
 
-    def select_action(self, data):
 
-        cpu = torch.device("cpu")
-        ret_tensors = list()
-        ret_pairs = list()
-
-        all_inputs = list()
-        instance_indices = list()
-        instance_candidate_pairs = list()
-
-        for ix, d in enumerate(data):
-            inputs, candidate_pairs = process_input_data(d)
-            instance_candidate_pairs.append(candidate_pairs)
-            all_inputs.extend(inputs)
-            instance_indices.extend(it.repeat(ix, len(inputs)))
-
-        action_values = self(all_inputs).detach().to(cpu)
-        _, max_vals_ixs = action_values.max(dim=1)
-
-        # Create slice views of the tensors
-        groups = it.groupby(enumerate(instance_indices), lambda t: t[1])
-        for instance_num, g in groups:
-            indices = [t[0] for t in g]
-            tensor_slice = action_values[indices, :]
-            row_ix = max_vals_ixs[indices].argmax()
-            # Compute the row with the highest index
-            row = tensor_slice[row_ix, :]
-            ret_tensors.append(row)
-            ret_pairs.append(instance_candidate_pairs[instance_num][row.argmax().item()])
-
-        return ret_pairs, torch.cat(ret_tensors).view((len(ret_tensors), -1))
 
     @staticmethod
     def raw2json(raw_vals):
