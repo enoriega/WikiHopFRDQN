@@ -64,12 +64,13 @@ def zero_init(m):
 
 
 class BaseApproximator(nn.Module):
-    def __init__(self, num_feats, zero_init_params=False):
+    def __init__(self, num_feats, zero_init_params=False, device="cpu"):
         super().__init__()
 
         self.num_feats = num_feats
 
-        self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+        # self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+        self.device = device
 
         self.layers = self.build_layers(num_feats)
 
@@ -167,8 +168,8 @@ class FullBQN(BaseApproximator):
             nn.Linear(20, 2),
         )
 
-    def __init__(self, num_feats, helper, zero_init_params):
-        super().__init__(num_feats, zero_init_params)
+    def __init__(self, num_feats, helper, zero_init_params, device):
+        super().__init__(num_feats, zero_init_params, device)
         self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
         self.bert = BertModel.from_pretrained('bert-base-uncased')
 
@@ -258,7 +259,7 @@ class BQN(BaseApproximator):
             nn.Linear(20, 2),
         )
 
-    def __init__(self, num_feats, helper, zero_init_params):
+    def __init__(self, num_feats, helper, zero_init_params, device):
         super().__init__(num_feats, zero_init_params)
         self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
         bert = BertModel.from_pretrained('bert-base-uncased')
@@ -313,7 +314,7 @@ class BQN(BaseApproximator):
 
 class DQN(BaseApproximator):
 
-    def __init__(self, num_feats, embeddings_helper, zero_init_params):
+    def __init__(self, num_feats, embeddings_helper, zero_init_params, device):
         self.e_helper = embeddings_helper
         super().__init__(num_feats, zero_init_params)
         self.fresh_embeddings = embeddings_helper.fresh_embeddings
@@ -381,8 +382,8 @@ class DQN(BaseApproximator):
 class LinearQN(BaseApproximator):
     """This is a linear approximator that doesn't use the embeddings at all"""
 
-    def __init__(self, num_feats, helper, zero_init_params):
-        super().__init__(num_feats, zero_init_params)
+    def __init__(self, num_feats, helper, zero_init_params, device):
+        super().__init__(num_feats, zero_init_params, device)
 
     def build_layers(self, num_feats):
         return nn.Sequential(
@@ -434,8 +435,8 @@ class LinearQN(BaseApproximator):
 class MLP(LinearQN):
     """This is a linear approximator that doesn't use the embeddings at all"""
 
-    def __init__(self, num_feats, helper, zero_init_params):
-        super().__init__(num_feats, helper, zero_init_params)
+    def __init__(self, num_feats, helper, zero_init_params, device):
+        super().__init__(num_feats, helper, zero_init_params, device)
 
     def build_layers(self, num_feats):
         return nn.Sequential(

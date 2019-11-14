@@ -16,6 +16,7 @@ with open('config.yml') as f:
     cfg = yaml.load(f, Loader=yaml.FullLoader)
 
 embeddings_cfg = cfg['embeddings']
+device = cfg['device']
 
 glove_path = embeddings_cfg['glove_path']
 voc_path = embeddings_cfg['voc_path']
@@ -73,7 +74,7 @@ def select_action():
         if not network:
             new_state, _ = dqn.process_input_data(data[0])
             k = len(new_state[0]['features'])
-            network = Approximator(k, helper, zero_init)
+            network = Approximator(k, helper, zero_init, device=device)
             if torch.cuda.is_available():
                 network = network.cuda()
 
@@ -96,7 +97,7 @@ def backwards():
         if not network:
             new_state, _ = dqn.process_input_data(data[0]['new_state'])
             k = len(new_state[0]['features'])
-            network = Approximator(k, helper, zero_init_params=zero_init)
+            network = Approximator(k, helper, zero_init_params=zero_init, device=device)
             if torch.cuda.is_available():
                 network = network.cuda()
 
@@ -170,12 +171,12 @@ def load():
 
         if Approximator == DQN:
             k = state['layers.0.weight'].shape[1] - helper.dimensions() * 2
-        elif Approximator == FullBQN:
-            k = state['layers.0.weight'].shape[1] - BertConfig.from_pretrained('bert-base-uncased').hidden_size
+        elif Approximator == BQN:
+            k = state['layers.0.weight'].shape[1] - BertConfig.from_pretrained('bert-base-uncased').hidden_size * 2
         else:
             k = state['layers.0.weight'].shape[1]
 
-        network = Approximator(k, helper, zero_init_params=zero_init)
+        network = Approximator(k, helper, zero_init_params=zero_init, device=device)
         network.load_state_dict(state)
         if torch.cuda.is_available():
             network = network.cuda()

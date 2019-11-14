@@ -3,4 +3,5 @@ embeddings:
   voc_path: "/Users/enrique/github/WikiHopFR/w2vvoc.txt"
   freeze: True
 model_dir: "."
+device: "cpu"
 
