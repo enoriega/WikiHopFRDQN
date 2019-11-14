@@ -62,31 +62,6 @@ def api_root():
     return 'Welcome to the magic of Deep Reinforcement Learning'
 
 
-# This call is deprecated, may erase it soon. It is superseded by select_action
-# @app.route('/forward', methods=['GET', 'PUT'])
-# def forward():
-#     if request.method == "PUT":
-#         data = json.loads(request.data)
-#
-#         # If this is the first time this is called, lazily build the network
-#         # This is necessary to compute the number features dynamically
-#         global network
-#         if not network:
-#             k = len(data[0]['features'])
-#             network = Approximator(k, helper, zero_init_params=zero_init)
-#             if torch.cuda.is_available():
-#                 network = network.cuda()
-#
-#         # Don't need to hold to the gradient here
-#         with torch.no_grad():
-#             raw_values = network(data)
-#             values = Approximator.raw2json(raw_values)
-#
-#         return json.dumps(values)
-#     else:
-#         return "Use the PUT method"
-
-
 @app.route('/select_action', methods=['GET', 'PUT'])
 def select_action():
     if request.method == "PUT":
@@ -195,7 +170,7 @@ def load():
 
         if Approximator == DQN:
             k = state['layers.0.weight'].shape[1] - helper.dimensions() * 2
-        elif Approximator == BQN:
+        elif Approximator == FullBQN:
             k = state['layers.0.weight'].shape[1] - BertConfig.from_pretrained('bert-base-uncased').hidden_size
         else:
             k = state['layers.0.weight'].shape[1]
