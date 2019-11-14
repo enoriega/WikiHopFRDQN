@@ -293,8 +293,8 @@ class BQN(BaseApproximator):
             eb_embeds = emb_dropout(EmbeddingsHelper.aggregate_embeddings(self.embeddings(eb_ids)))
 
             # Build a vector out of the numerical features, sorted by feature name
-            f = [features[k] for k in sorted_features]
-            f = torch.FloatTensor(f, device=self.device)
+            f = [float(features[k]) for k in sorted_features]
+            f = torch.tensor(f, device=self.device)
 
             f = torch.cat([f, ea_embeds, eb_embeds])
 
