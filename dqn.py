@@ -6,6 +6,7 @@ import torch.nn.functional as F
 from torch import nn
 import numpy as np
 from transformers import *
+import utils
 
 from embeddings import EmbeddingsHelper
 
@@ -249,22 +250,25 @@ class BQN(BaseApproximator):
         # Store the helper to use it on the forward method
         # This is necessary for the instance to recognize the embeddings as parameters of the network
 
-        config = BertConfig.from_pretrained('bert-base-uncased')
-        k = num_feats + (config.hidden_size * 2)
+        # config = BertConfig.from_pretrained('bert-base-uncased')
+        k = num_feats + 50 * 2#(config.hidden_size * 2)
 
         # Layers of the network
         return nn.Sequential(
             nn.Linear(k, 20),
             nn.Tanh(),
+            nn.Dropout(p=0.2),
             nn.Linear(20, 2),
         )
 
     def __init__(self, num_feats, helper, zero_init_params, device):
         super().__init__(num_feats, zero_init_params)
         self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-        bert = BertModel.from_pretrained('bert-base-uncased')
-        self.embeddings = bert.embeddings.word_embeddings
-        self.emb_dropout = nn.Dropout()
+        embeddings_matrix = list(utils.get_bert_embeddings().parameters())[0]
+        # Do PCA on the embeddings to take the top 50 components
+        embeddings_matrix = utils.pca(embeddings_matrix, 50)
+        self.embeddings = nn.EmbeddingBag.from_pretrained(embeddings_matrix, mode='mean')
+        self.emb_dropout = nn.Dropout(p=0.2)
 
     def forward(self, data):
         # Parse the input data into tensor form
@@ -287,11 +291,14 @@ class BQN(BaseApproximator):
             ea_tokens = list(it.chain.from_iterable(tokenizer.tokenize(t) for t in sorted(entity_a)))
             eb_tokens = list(it.chain.from_iterable(tokenizer.tokenize(t) for t in sorted(entity_b)))
 
-            ea_ids = torch.tensor(tokenizer.convert_tokens_to_ids(ea_tokens), device=self.device)
-            eb_ids = torch.tensor(tokenizer.convert_tokens_to_ids(eb_tokens), device=self.device)
+            ea_ids = torch.tensor([tokenizer.convert_tokens_to_ids(ea_tokens)], device=self.device)
+            eb_ids = torch.tensor([tokenizer.convert_tokens_to_ids(eb_tokens)], device=self.device)
 
-            ea_embeds = emb_dropout(EmbeddingsHelper.aggregate_embeddings(self.embeddings(ea_ids)))
-            eb_embeds = emb_dropout(EmbeddingsHelper.aggregate_embeddings(self.embeddings(eb_ids)))
+            # ea_embeds = emb_dropout(EmbeddingsHelper.aggregate_embeddings(self.embeddings(ea_ids)))
+            # eb_embeds = emb_dropout(EmbeddingsHelper.aggregate_embeddings(self.embeddings(eb_ids)))
+
+            ea_embeds = emb_dropout(self.embeddings(ea_ids).squeeze())
+            eb_embeds = emb_dropout(self.embeddings(eb_ids).squeeze())
 
             # Build a vector out of the numerical features, sorted by feature name
             f = [float(features[k]) for k in sorted_features]
