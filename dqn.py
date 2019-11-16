@@ -257,7 +257,7 @@ class BQN(BaseApproximator):
         return nn.Sequential(
             nn.Linear(k, 20),
             nn.Tanh(),
-            nn.Dropout(p=0.2),
+            # nn.Dropout(p=0.2),
             nn.Linear(20, 2),
         )
 
@@ -297,8 +297,8 @@ class BQN(BaseApproximator):
             # ea_embeds = emb_dropout(EmbeddingsHelper.aggregate_embeddings(self.embeddings(ea_ids)))
             # eb_embeds = emb_dropout(EmbeddingsHelper.aggregate_embeddings(self.embeddings(eb_ids)))
 
-            ea_embeds = emb_dropout(self.embeddings(ea_ids).squeeze())
-            eb_embeds = emb_dropout(self.embeddings(eb_ids).squeeze())
+            ea_embeds = self.embeddings(ea_ids).squeeze()
+            eb_embeds = self.embeddings(eb_ids).squeeze()
 
             # Build a vector out of the numerical features, sorted by feature name
             f = [float(features[k]) for k in sorted_features]
