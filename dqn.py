@@ -21,12 +21,14 @@ def process_input_data(datum):
     """Converts a state datum into a sequence of features ready to be passed to the network"""
     # First, compute cartesian product of the candidate entities
     candidate_entities = [frozenset(e) for e in datum['candidates']]
+    candidate_entity_types = [e for e in datum['candidatesTypes']]
 
-    ranks, iteration_introductions, entity_usage, explore_scores, exploit_scores = {}, {}, {}, {}, {}
+    ranks, iteration_introductions, entity_usage, explore_scores, exploit_scores, types = {}, {}, {}, {}, {}, {}
     for ix, e in enumerate(candidate_entities):
         ranks[e] = datum['ranks'][ix]
         iteration_introductions[e] = datum['iterationsOfIntroduction'][ix]
         entity_usage[e] = datum['entityUsage'][ix]
+        types[e] = candidate_entity_types[ix]
 
     exploit_scores = datum['exploitScores']
     explore_scores = datum['exploreScores']
@@ -50,7 +52,10 @@ def process_input_data(datum):
             'same_component': same_components[ix],
         }
 
-        inputs.append({'features': {**features, **new_features}, 'A': a, 'B': b})
+        typeA = 'UNK' if len(types[a]) == 0 else types[a][0]
+        typeB = 'UNK' if len(types[b]) == 0 else types[b][0]
+
+        inputs.append({'features': {**features, **new_features}, 'A': a, 'B': b, 'typeA': typeA, 'typeB': typeB})
 
     return inputs, candidate_pairs
 
@@ -250,8 +255,9 @@ class BQN(BaseApproximator):
         # Store the helper to use it on the forward method
         # This is necessary for the instance to recognize the embeddings as parameters of the network
 
-        # config = BertConfig.from_pretrained('bert-base-uncased')
-        k = num_feats + 50 * 2#(config.hidden_size * 2)
+        config = BertConfig.from_pretrained('bert-base-uncased')
+        # The features, plus the entity type embeddings for both embeddings plus the aggregated embeddings for both
+        k = num_feats + 50 * 2 + (config.hidden_size * 2)
 
         # Layers of the network
         return nn.Sequential(
@@ -266,8 +272,11 @@ class BQN(BaseApproximator):
         self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
         embeddings_matrix = list(utils.get_bert_embeddings().parameters())[0]
         # Do PCA on the embeddings to take the top 50 components
-        embeddings_matrix = utils.pca(embeddings_matrix, 50)
+        # embeddings_matrix = utils.pca(embeddings_matrix, 50)
         self.embeddings = nn.EmbeddingBag.from_pretrained(embeddings_matrix, mode='mean')
+
+        self.entity_types = {w: torch.tensor(ix, device=self.device) for ix, w in enumerate(['UNK', 'Person', 'Location', 'Organization'])}
+        self.type_embeddings = nn.Embedding(len(self.entity_types), 50)
         self.emb_dropout = nn.Dropout(p=0.2)
 
     def forward(self, data):
@@ -286,6 +295,8 @@ class BQN(BaseApproximator):
             features = datum['features']
             entity_a = datum['A']
             entity_b = datum['B']
+            entity_a_type = datum['typeA']
+            entity_b_type = datum['typeB']
 
             # Put together the entity pair as a sequence for BERT's
             ea_tokens = list(it.chain.from_iterable(tokenizer.tokenize(t) for t in sorted(entity_a)))
@@ -300,11 +311,14 @@ class BQN(BaseApproximator):
             ea_embeds = self.embeddings(ea_ids).squeeze()
             eb_embeds = self.embeddings(eb_ids).squeeze()
 
+            eat_embeds = self.type_embeddings(self.entity_types[entity_a_type])
+            ebt_embeds = self.type_embeddings(self.entity_types[entity_b_type])
+
             # Build a vector out of the numerical features, sorted by feature name
             f = [float(features[k]) for k in sorted_features]
             f = torch.tensor(f, device=self.device)
 
-            f = torch.cat([f, ea_embeds, eb_embeds])
+            f = torch.cat([f, eat_embeds, ea_embeds, ebt_embeds, eb_embeds])
 
             # Concatenate them into a single input vector for this instance
             batch_features.append(f)
