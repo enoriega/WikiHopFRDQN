@@ -49,7 +49,7 @@ if __name__ == "__main__":
     ser = Serializer()
 
     # Group it by document
-    groups = [(g, list(e)) for g, e in it.groupby(rows, key=attrgetter('doc'))]
+    groups = [(g, list(e)) for g, e in it.groupby(rows[:100], key=attrgetter('doc'))]
 
     # Load bert
     bert = BertModel.from_pretrained('bert-base-uncased')
