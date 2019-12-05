@@ -39,7 +39,7 @@ class HiddenState(Base):
 
     def __init__(self, index, state):
         self.index = index
-        self.state = state
+        self.vector = state
 
 
 class Sentence(Base):
