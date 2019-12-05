@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, Float, String, ForeignKey, PickleType
+from sqlalchemy import create_engine, Column, Integer, Float, String, ForeignKey, PickleType, Index
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from berter import ProcessedDatum
@@ -45,8 +45,8 @@ class HiddenState(Base):
 class Sentence(Base):
     __tablename__ = 'sentence'
     id = Column(Integer, primary_key=True)
-    doc = Column(String)
-    index = Column(Integer)
+    doc = Column(String, index=True)
+    index = Column(Integer, index=True)
     pooler_id = Column(Integer, ForeignKey('vector.id'))
     pooler = relationship("Vector")
     states = relationship("HiddenState")
@@ -54,6 +54,9 @@ class Sentence(Base):
     def __init__(self, doc, index):
         self.doc = doc
         self.index = index
+
+
+Index('fr_index', Sentence.doc, Sentence.index)
 
 
 def add_elem(d: ProcessedDatum, s):
