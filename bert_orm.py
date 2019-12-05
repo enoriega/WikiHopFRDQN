@@ -1,23 +1,13 @@
-from sqlalchemy import create_engine, Column, Integer, Float, String, ForeignKey, PickleType, Index
+import pickle
+
+from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, PickleType, Index
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
-from berter import ProcessedDatum
-import pickle
 from tqdm import tqdm
 
+from berter import ProcessedDatum
+
 Base = declarative_base()
-
-
-# class Component(Base):
-#     __tablename__ = 'component'
-#     id = Column(Integer, primary_key=True)
-#     index = Column(Integer)
-#     val = Column(Float)
-#     vector_id = Column(Integer, ForeignKey('vector.id'))
-#
-#     def __init__(self, index, val):
-#         self.index = index
-#         self.val = val
 
 
 class Vector(Base):

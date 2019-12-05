@@ -275,7 +275,7 @@ class BQN(BaseApproximator):
         # embeddings_matrix = utils.pca(embeddings_matrix, 50)
         self.embeddings = nn.EmbeddingBag.from_pretrained(embeddings_matrix, mode='mean')
 
-        self.entity_types = {w: torch.tensor(ix, device=self.device) for ix, w in enumerate(['UNK', 'Person', 'Location', 'Organization'])}
+        self.entity_types = {w: torch.tensor(ix, device=self.device) for ix, w in enumerate(['UNK', 'Person', 'Location', 'Organization', 'CommonNoun'])}
         self.type_embeddings = nn.Embedding(len(self.entity_types), 50)
         self.emb_dropout = nn.Dropout(p=0.2)
 
