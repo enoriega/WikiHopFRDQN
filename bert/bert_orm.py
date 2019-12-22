@@ -5,7 +5,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from tqdm import tqdm
 
-from berter import ProcessedDatum
+from bert.berter import ProcessedDatum
 
 Base = declarative_base()
 
@@ -13,7 +13,7 @@ Base = declarative_base()
 class Vector(Base):
     __tablename__ = 'vector'
     id = Column(Integer, primary_key=True)
-    hidden_state_id = Column(Integer, ForeignKey("hiddenstate.id"))
+    hidden_state_id = Column(Integer, ForeignKey("hiddenstate.id"), index=True)
     data = Column(PickleType)
 
     def __init__(self, data):
@@ -24,7 +24,7 @@ class HiddenState(Base):
     __tablename__ = 'hiddenstate'
     id = Column(Integer, primary_key=True)
     index = Column(Integer)
-    sentence_id = Column(Integer, ForeignKey("sentence.id"))
+    sentence_id = Column(Integer, ForeignKey("sentence.id"), index=True)
     vector = relationship("Vector", uselist=False)
 
     def __init__(self, index, state):
@@ -77,6 +77,7 @@ def populate_database(e, s):
         except EOFError:
             pass
     pbar.close()
+
 
 
 if __name__ == '__main__':

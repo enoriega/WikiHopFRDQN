@@ -40,17 +40,21 @@ class Serializer:
         return str(item) in self.record
 
 
-if __name__ == "__main__":
-    # Parse the TSV file with the data
-    with open(PATH) as f:
+def parse_sentences(path:str):
+    with open(path) as f:
         reader = csv.reader(f, delimiter="\t")
         rows = [Entry(r[0], int(r[1]), r[-1]) for r in reader]
 
-    ser = Serializer()
-
     # Group it by document
-    groups = [(g, list(e)) for g, e in it.groupby(rows[:100], key=attrgetter('doc'))]
+    groups = [(g, list(e)) for g, e in it.groupby(rows, key=attrgetter('doc'))]
 
+    return groups
+
+
+if __name__ == "__main__":
+    # Parse the TSV file with the data
+    groups = parse_sentences(PATH)
+    ser = Serializer()
     # Load bert
     bert = BertModel.from_pretrained('bert-base-uncased')
     tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')

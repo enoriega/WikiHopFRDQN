@@ -7,8 +7,8 @@ from torch import nn
 import numpy as np
 from transformers import *
 import utils
-
-from embeddings import EmbeddingsHelper
+# from bert.bert_orm import entity_origin_to_embeddings
+from bert.PrecomputedBert import PrecomputedBert
 
 
 def death_gradient(parameters):
@@ -275,6 +275,7 @@ class BQN(BaseApproximator):
 
     def __init__(self, num_feats, helper, zero_init_params, device):
         super().__init__(num_feats, zero_init_params)
+        self.bert_helper = PrecomputedBert()
         self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
         embeddings_matrix = list(utils.get_bert_embeddings().parameters())[0]
         # Do PCA on the embeddings to take the top 50 components
@@ -306,18 +307,22 @@ class BQN(BaseApproximator):
             origins_a = datum['originsA']
             origins_b = datum['originsB']
 
-            # Put together the entity pair as a sequence for BERT's
-            ea_tokens = list(it.chain.from_iterable(tokenizer.tokenize(t) for t in sorted(entity_a)))
-            eb_tokens = list(it.chain.from_iterable(tokenizer.tokenize(t) for t in sorted(entity_b)))
-
-            ea_ids = torch.tensor([tokenizer.convert_tokens_to_ids(ea_tokens)], device=self.device)
-            eb_ids = torch.tensor([tokenizer.convert_tokens_to_ids(eb_tokens)], device=self.device)
-
-            # ea_embeds = emb_dropout(EmbeddingsHelper.aggregate_embeddings(self.embeddings(ea_ids)))
-            # eb_embeds = emb_dropout(EmbeddingsHelper.aggregate_embeddings(self.embeddings(eb_ids)))
-
-            ea_embeds = self.embeddings(ea_ids).squeeze()
-            eb_embeds = self.embeddings(eb_ids).squeeze()
+            # # Put together the entity pair as a sequence for BERT's
+            # ea_tokens = list(it.chain.from_iterable(tokenizer.tokenize(t) for t in sorted(entity_a)))
+            # eb_tokens = list(it.chain.from_iterable(tokenizer.tokenize(t) for t in sorted(entity_b)))
+            #
+            # ea_ids = torch.tensor([tokenizer.convert_tokens_to_ids(ea_tokens)], device=self.device)
+            # eb_ids = torch.tensor([tokenizer.convert_tokens_to_ids(eb_tokens)], device=self.device)
+            #
+            # # ea_embeds = emb_dropout(EmbeddingsHelper.aggregate_embeddings(self.embeddings(ea_ids)))
+            # # eb_embeds = emb_dropout(EmbeddingsHelper.aggregate_embeddings(self.embeddings(eb_ids)))
+            #
+            # ea_embeds = self.embeddings(ea_ids).squeeze()
+            # eb_embeds = self.embeddings(eb_ids).squeeze()
+            ea_embeds = self.bert_helper.entity_origin_to_embeddings(origins_a[0])
+            ea_embeds = ea_embeds.mean(dim=0)
+            eb_embeds = self.bert_helper.entity_origin_to_embeddings(origins_b[0])
+            eb_embeds = eb_embeds.mean(dim=0)
 
             eat_embeds = self.type_embeddings(self.entity_types[entity_a_type])
             ebt_embeds = self.type_embeddings(self.entity_types[entity_b_type])
