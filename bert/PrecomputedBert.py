@@ -22,20 +22,30 @@ class PrecomputedBert:
         self.bert = BertModel.from_pretrained('bert-base-uncased')
         self.embeddings = utils.get_bert_embeddings()
         self.engine = create_engine(database_path)
+        self.cache = dict()
         Session = sessionmaker(bind=self.engine)
         self.session = Session()
 
     def entity_to_embeddings(self, e):
         """ Runs the entity through bert """
         tokenizer = self.tokenizer
-        bert = self.bert
-        ids = torch.tensor([tokenizer.encode(tokenizer.cls_token + " " + " ".join(e) + " " + tokenizer.sep_token)])
-        hidden_states, _ = bert(ids)
+        key = tokenizer.cls_token + " " + " ".join(e) + " " + tokenizer.sep_token
+        if key in self.cache:
+            return self.cache[key]
+        else:
+            # Call bert over the entity
+            bert = self.bert
+            with torch.no_grad():
+                ids = torch.tensor([tokenizer.encode(key)])
+                hidden_states, _ = bert(ids)
 
-        # Get rid of the [CLS] and [SEP] tokens
-        res = hidden_states.squeeze()[1:-1, :]
+                # Get rid of the [CLS] and [SEP] tokens
+                res = hidden_states.squeeze()[1:-1, :]
 
-        return res
+                # Memorize the result to not run bert over this entity again
+                self.cache[key] = res.detach()
+
+                return res
 
     def entity_to_subword_embeddings(self, e):
         """ Returns the subword embeddins before going through Bert's pipeline """

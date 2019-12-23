@@ -151,8 +151,6 @@ class BaseApproximator(nn.Module):
 
         return ret_pairs, torch.cat(ret_tensors).view((len(ret_tensors), -1))
 
-
-
     @staticmethod
     def raw2json(raw_vals):
         ret = list()
@@ -162,6 +160,7 @@ class BaseApproximator(nn.Module):
             ret.append({"Exploration": row[0].item(), "Exploitation": row[1].item()})
 
         return ret
+
 
 # class FullBQN(BaseApproximator):
 #     """ This approximator user BERT """
@@ -282,7 +281,8 @@ class BQN(BaseApproximator):
         # embeddings_matrix = utils.pca(embeddings_matrix, 50)
         self.embeddings = nn.EmbeddingBag.from_pretrained(embeddings_matrix, mode='mean')
 
-        self.entity_types = {w: torch.tensor(ix, device=self.device) for ix, w in enumerate(['UNK', 'Person', 'Location', 'Organization', 'CommonNoun'])}
+        self.entity_types = {w: torch.tensor(ix, device=self.device) for ix, w in
+                             enumerate(['UNK', 'Person', 'Location', 'Organization', 'CommonNoun'])}
         self.type_embeddings = nn.Embedding(len(self.entity_types), 50)
         self.emb_dropout = nn.Dropout(p=0.2)
 
@@ -319,16 +319,10 @@ class BQN(BaseApproximator):
             #
             # ea_embeds = self.embeddings(ea_ids).squeeze()
             # eb_embeds = self.embeddings(eb_ids).squeeze()
-            if len(origins_a) > 0:
-                ea_embeds = self.bert_helper.entity_origin_to_embeddings(origins_a[0])
-            else:
-                ea_embeds = self.bert_helper.entity_to_subword_embeddings(entity_a)
+            ea_embeds = self.get_embeddings(entity_a, origins_a)
             ea_embeds = ea_embeds.mean(dim=0)
 
-            if len(origins_b) > 0:
-                eb_embeds = self.bert_helper.entity_origin_to_embeddings(origins_b[0])
-            else:
-                eb_embeds = self.bert_helper.entity_to_subword_embeddings(entity_b)
+            eb_embeds = self.get_embeddings(entity_b, origins_b)
             eb_embeds = eb_embeds.mean(dim=0)
 
             eat_embeds = self.type_embeddings(self.entity_types[entity_a_type])
@@ -351,6 +345,16 @@ class BQN(BaseApproximator):
         values = self.layers(feature_matrix)
 
         return values
+
+    def get_embeddings(self, entity_tokens, entity_origins):
+        if len(entity_origins) > 0:
+            try:
+                ea_embeds = self.bert_helper.entity_origin_to_embeddings(entity_origins[0])
+            except (ValueError, AttributeError, KeyError, AssertionError):
+                ea_embeds = self.bert_helper.entity_to_embeddings(entity_tokens)
+        else:
+            ea_embeds = self.bert_helper.entity_to_embeddings(entity_tokens)
+        return ea_embeds
 
 
 class DQN(BaseApproximator):
