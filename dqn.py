@@ -1,6 +1,7 @@
 import itertools as it
 from abc import abstractmethod
 
+import logging
 import torch
 import torch.nn.functional as F
 from torch import nn
@@ -9,6 +10,9 @@ from transformers import *
 import utils
 # from bert.bert_orm import entity_origin_to_embeddings
 from bert.PrecomputedBert import PrecomputedBert
+
+logging.basicConfig(filename='app.log', filemode='w', level=logging.DEBUG, format='%(name)s - %(levelname)s - %(message)s')
+# logging.warning('This will get logged to a file')
 
 
 def death_gradient(parameters):
@@ -350,8 +354,10 @@ class BQN(BaseApproximator):
         if len(entity_origins) > 0:
             try:
                 ea_embeds = self.bert_helper.entity_origin_to_embeddings(entity_origins[0])
-            except (ValueError, AttributeError, KeyError, AssertionError):
+                logging.debug("Successful fetch")
+            except Exception as e:
                 ea_embeds = self.bert_helper.entity_to_embeddings(entity_tokens)
+                logging.debug("Exception on fetch " + str(e))
         else:
             ea_embeds = self.bert_helper.entity_to_embeddings(entity_tokens)
         return ea_embeds
