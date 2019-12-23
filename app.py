@@ -7,6 +7,7 @@ from flask import Flask, request
 from transformers import BertConfig
 
 import dqn
+from bert.PrecomputedBert import PrecomputedBert
 from dqn import DQN, LinearQN, MLP, BQN
 from embeddings import EmbeddingsHelper
 
@@ -17,6 +18,7 @@ with open('config.yml') as f:
 
 embeddings_cfg = cfg['embeddings']
 device = cfg['device']
+bert_cfg = cfg['bert']
 
 glove_path = embeddings_cfg['glove_path']
 voc_path = embeddings_cfg['voc_path']
@@ -24,7 +26,8 @@ freeze_embeddings = embeddings_cfg['freeze']
 
 model_dir = cfg['model_dir']
 
-helper = EmbeddingsHelper(glove_path, voc_path, freeze_embeddings)
+# helper = EmbeddingsHelper(glove_path, voc_path, freeze_embeddings)
+helper = None
 
 network = None
 trainer = None
@@ -44,16 +47,22 @@ def configuration_hook():
             zero_init = False
 
     if 'approximator' in request.args:
-        global Approximator
+        global Approximator, helper
+
         val = request.args.get('approximator')
         if val.lower() == 'linear':
             Approximator = LinearQN
+            helper = EmbeddingsHelper(glove_path, voc_path, freeze_embeddings)
         elif val.lower() == 'dqn':
             Approximator = DQN
+            helper = EmbeddingsHelper(glove_path, voc_path, freeze_embeddings)
         elif val.lower() == 'mlp':
             Approximator = MLP
+            helper = EmbeddingsHelper(glove_path, voc_path, freeze_embeddings)
         elif val.lower() == 'bqn':
             Approximator = BQN
+            helper = PrecomputedBert(bert_cfg['sentences_path'], bert_cfg['database_path'])
+
         else:
             raise NotImplementedError("Approximator %s not implemented" % val)
 
@@ -193,7 +202,7 @@ def reset():
     network = None
     trainer = None
 
-    helper = EmbeddingsHelper(glove_path, voc_path)
+    # helper = EmbeddingsHelper(glove_path, voc_path)
 
     return "Reset the parameters"
 

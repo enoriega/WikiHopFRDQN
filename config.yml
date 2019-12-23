@@ -2,6 +2,9 @@ embeddings:
   glove_path: "/Users/enrique/github/WikiHopFR/glove/glove.6B.50d.txt"
   voc_path: "/Users/enrique/github/WikiHopFR/w2vvoc.txt"
   freeze: True
+bert:
+  sentences_path: 'sentences_w_relations_new.tsv'
+  database_path: 'sqlite:////Volumes/My Passport/test2.sqlite'
 model_dir: "."
 device: "cpu"
 
