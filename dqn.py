@@ -319,9 +319,16 @@ class BQN(BaseApproximator):
             #
             # ea_embeds = self.embeddings(ea_ids).squeeze()
             # eb_embeds = self.embeddings(eb_ids).squeeze()
-            ea_embeds = self.bert_helper.entity_origin_to_embeddings(origins_a[0])
+            if len(origins_a) > 0:
+                ea_embeds = self.bert_helper.entity_origin_to_embeddings(origins_a[0])
+            else:
+                ea_embeds = self.bert_helper.entity_to_subword_embeddings(entity_a)
             ea_embeds = ea_embeds.mean(dim=0)
-            eb_embeds = self.bert_helper.entity_origin_to_embeddings(origins_b[0])
+
+            if len(origins_b) > 0:
+                eb_embeds = self.bert_helper.entity_origin_to_embeddings(origins_b[0])
+            else:
+                eb_embeds = self.bert_helper.entity_to_subword_embeddings(entity_b)
             eb_embeds = eb_embeds.mean(dim=0)
 
             eat_embeds = self.type_embeddings(self.entity_types[entity_a_type])
