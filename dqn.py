@@ -278,7 +278,7 @@ class BQN(BaseApproximator):
 
     def __init__(self, num_feats, helper, zero_init_params, device):
         super().__init__(num_feats, zero_init_params)
-        self.bert_helper = PrecomputedBert()
+        self.bert_helper = helper
         self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
         embeddings_matrix = list(utils.get_bert_embeddings().parameters())[0]
         # Do PCA on the embeddings to take the top 50 components
