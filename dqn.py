@@ -86,7 +86,6 @@ class BaseApproximator(nn.Module):
 
         self.num_feats = num_feats
 
-        # self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
         self.device = device
 
         self.layers = self.build_layers(num_feats)
@@ -166,97 +165,6 @@ class BaseApproximator(nn.Module):
         return ret
 
 
-# class FullBQN(BaseApproximator):
-#     """ This approximator user BERT """
-#
-#     def build_layers(self, num_feats):
-#         # Store the helper to use it on the forward method
-#         # This is necessary for the instance to recognize the embeddings as parameters of the network
-#
-#         config = BertConfig.from_pretrained('bert-base-uncased')
-#         k = num_feats + config.hidden_size
-#
-#         # Layers of the network
-#         return nn.Sequential(
-#             nn.Linear(k, 20),
-#             nn.Tanh(),
-#             nn.Linear(20, 2),
-#         )
-#
-#     def __init__(self, num_feats, helper, zero_init_params, device):
-#         super().__init__(num_feats, zero_init_params, device)
-#         self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-#         self.bert = BertModel.from_pretrained('bert-base-uncased')
-#
-#     def forward(self, data):
-#         # Parse the input data into tensor form
-#         bert_ids, bert_types, feature_matrix = self.tensor_form(data)
-#
-#         # Retrieve the un-processed pooler outputs from the last hidden states
-#         pooled_vectors = list()
-#         for ids, types in zip(bert_ids, bert_types):
-#             last_hidden_state, _ = self.bert(ids, token_type_ids=types)
-#             del _
-#             cls_h = last_hidden_state[0, 0, :]
-#             pooled_vectors.append(cls_h)
-#
-#         pooled_vectors = torch.stack(pooled_vectors)
-#         matrix = torch.cat([feature_matrix, pooled_vectors], dim=1)
-#         # Feed the batch  through the network's layers
-#         values = self.layers(matrix)
-#
-#         del bert_ids, bert_types, feature_matrix, pooled_vectors, matrix
-#
-#         return values
-#
-#     def tensor_form(self, data):
-#         # Convert the raw data to tensor form
-#         batch_ids, batch_types, batch_features = list(), list(), list()
-#
-#         tokenizer = self.tokenizer
-#         sorted_features = list(sorted(data[0]['features']))
-#
-#         # Create an input vector for each of the elements in data
-#         for datum in data:
-#             # Get the raw input
-#             features = datum['features']
-#             entity_a = datum['A']
-#             entity_b = datum['B']
-#
-#             # Put together the entity pair as a sequence for BERT's
-#
-#             ea_tokens = list(it.chain.from_iterable(tokenizer.tokenize(t) for t in sorted(entity_a)))
-#             eb_tokens = list(it.chain.from_iterable(tokenizer.tokenize(t) for t in sorted(entity_b)))
-#
-#             bert_tokens = ['[CLS]'] + \
-#                           ea_tokens + \
-#                           ['[SEP]'] + \
-#                           eb_tokens + \
-#                           ['[SEP]']
-#
-#             bert_token_types = torch.tensor([[0] * (len(ea_tokens) + 2) + [1] * (len(eb_tokens) + 1)], device=self.device)
-#             batch_types.append(bert_token_types)
-#
-#             bert_ids = torch.tensor([tokenizer.convert_tokens_to_ids(bert_tokens)], device=self.device)
-#
-#             # Build a vector out of the numerical features, sorted by feature name
-#             f = [features[k] for k in sorted_features]
-#             f = torch.FloatTensor(f, device=self.device)
-#
-#             # Concatenate them into a single input vector for this instance
-#             batch_ids.append(bert_ids)
-#             batch_features.append(f)
-#
-#         # Create an input matrix from all the elements (the batch)
-#         num_features = batch_features[0].shape[0]
-#         # batch = torch.cat(batch).view((len(batch), input_dim))
-#         bert_inputs = batch_ids
-#         bert_types = batch_types
-#         feature_matrix = torch.cat(batch_features).view(len(batch_features), num_features)
-#
-#         return bert_inputs, bert_types, feature_matrix
-
-
 class BQN(BaseApproximator):
     """ This approximator user BERT instead of embeddings """
 
@@ -264,100 +172,91 @@ class BQN(BaseApproximator):
         # Store the helper to use it on the forward method
         # This is necessary for the instance to recognize the embeddings as parameters of the network
 
-        config = BertConfig.from_pretrained('bert-base-uncased')
-        # The features, plus the entity type embeddings for both embeddings plus the aggregated embeddings for both
-        k = num_feats + 50 * 2 + (config.hidden_size * 2)
+        # The features, the aggregated embeddings for both
+        k = num_feats + 200
 
         # Layers of the network
         return nn.Sequential(
-            nn.Linear(k, 20),
+            nn.Linear(k, 100),
             nn.Tanh(),
-            # nn.Dropout(p=0.2),
+            nn.Dropout(p=0.2),
+            nn.Linear(100, 20),
+            nn.Tanh(),
+            nn.Dropout(p=0.2),
             nn.Linear(20, 2),
         )
 
     def __init__(self, num_feats, helper, zero_init_params, device):
+        self.config = BertConfig.from_pretrained('bert-base-uncased')
         super().__init__(num_feats, zero_init_params)
         self.bert_helper = helper
-        self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-        embeddings_matrix = list(utils.get_bert_embeddings().parameters())[0]
-        # Do PCA on the embeddings to take the top 50 components
-        # embeddings_matrix = utils.pca(embeddings_matrix, 50)
-        self.embeddings = nn.EmbeddingBag.from_pretrained(embeddings_matrix, mode='mean')
+        self.tokenizer = helper.tokenizer
 
         self.entity_types = {w: torch.tensor(ix, device=self.device) for ix, w in
                              enumerate(['UNK', 'Person', 'Location', 'Organization', 'CommonNoun'])}
         self.type_embeddings = nn.Embedding(len(self.entity_types), 50)
         self.emb_dropout = nn.Dropout(p=0.2)
 
+        self.combinator = nn.Sequential(
+            nn.Linear(self.config.hidden_size*2, self.config.hidden_size),
+            nn.Tanh(),
+            nn.Dropout(p=0.2),
+            nn.Linear(self.config.hidden_size, 200),
+            nn.Tanh(),
+            nn.Dropout(p=0.2)
+        )
+
     def forward(self, data):
         # Parse the input data into tensor form
 
         # Convert the raw data to tensor form
-        batch_ids, batch_types, batch_features = list(), list(), list()
+        batch_ids, batch_types, batch_features, batch_embeds = list(), list(), list(), list()
 
-        tokenizer = self.tokenizer
-        emb_dropout = self.emb_dropout
         sorted_features = list(sorted(data[0]['features']))
 
         # Create an input vector for each of the elements in data
         for datum in data:
-            # Get the raw input
-            features = datum['features']
-            entity_a = datum['A']
-            entity_b = datum['B']
-            entity_a_type = datum['typeA']
-            entity_b_type = datum['typeB']
-            origins_a = datum['originsA']
-            origins_b = datum['originsB']
+            with torch.no_grad():
+                # Get the raw input
+                features = datum['features']
+                entity_a = datum['A']
+                entity_b = datum['B']
+                origins_a = datum['originsA']
+                origins_b = datum['originsB']
 
-            # # Put together the entity pair as a sequence for BERT's
-            # ea_tokens = list(it.chain.from_iterable(tokenizer.tokenize(t) for t in sorted(entity_a)))
-            # eb_tokens = list(it.chain.from_iterable(tokenizer.tokenize(t) for t in sorted(entity_b)))
-            #
-            # ea_ids = torch.tensor([tokenizer.convert_tokens_to_ids(ea_tokens)], device=self.device)
-            # eb_ids = torch.tensor([tokenizer.convert_tokens_to_ids(eb_tokens)], device=self.device)
-            #
-            # # ea_embeds = emb_dropout(EmbeddingsHelper.aggregate_embeddings(self.embeddings(ea_ids)))
-            # # eb_embeds = emb_dropout(EmbeddingsHelper.aggregate_embeddings(self.embeddings(eb_ids)))
-            #
-            # ea_embeds = self.embeddings(ea_ids).squeeze()
-            # eb_embeds = self.embeddings(eb_ids).squeeze()
-            ea_embeds = self.get_embeddings(entity_a, origins_a)
-            ea_embeds = ea_embeds.mean(dim=0)
+                ea_embeds = self.get_embeddings(entity_a, origins_a)
+                ea_embeds = ea_embeds.sum(dim=0)
+                ea_embeds /= ea_embeds.norm().detach()
 
-            eb_embeds = self.get_embeddings(entity_b, origins_b)
-            eb_embeds = eb_embeds.mean(dim=0)
+                eb_embeds = self.get_embeddings(entity_b, origins_b)
+                eb_embeds = eb_embeds.sum(dim=0)
+                eb_embeds /= eb_embeds.norm().detach()
 
-            eat_embeds = self.type_embeddings(self.entity_types[entity_a_type])
-            ebt_embeds = self.type_embeddings(self.entity_types[entity_b_type])
+                embeds = torch.cat([ea_embeds, eb_embeds])
+                batch_embeds.append(embeds)
 
-            # Build a vector out of the numerical features, sorted by feature name
-            f = [float(features[k]) for k in sorted_features]
-            f = torch.tensor(f, device=self.device)
+                # Build a vector out of the numerical features, sorted by feature name
+                f = [float(features[k]) for k in sorted_features]
+                f = torch.tensor(f, device=self.device)
+                batch_features.append(f)
 
-            f = torch.cat([f, eat_embeds, ea_embeds, ebt_embeds, eb_embeds])
+        # Use the combination function of the entity embeddings
+        comb = self.combinator(torch.stack(batch_embeds))
 
-            # Concatenate them into a single input vector for this instance
-            batch_features.append(f)
+        f = torch.cat([torch.stack(batch_features), comb], dim=1)
 
-        # Create an input matrix from all the elements (the batch)
-        num_features = batch_features[0].shape[0]
-
-        feature_matrix = torch.cat(batch_features).view(len(batch_features), num_features)
-
-        values = self.layers(feature_matrix)
+        values = self.layers(f)
 
         return values
 
-    def get_embeddings(self, entity_tokens, entity_origins):
+    def get_embeddings(self, entity_tokens, entity_origins) -> torch.Tensor:
         if len(entity_origins) > 0:
             try:
                 ea_embeds = self.bert_helper.entity_origin_to_embeddings(entity_origins[0])
                 logging.debug("Successful fetch")
             except Exception as e:
                 ea_embeds = self.bert_helper.entity_to_embeddings(entity_tokens)
-                logging.debug("Exception on fetch " + str(e))
+                logging.debug(repr(type(e)) + " on fetch " + str(e))
         else:
             ea_embeds = self.bert_helper.entity_to_embeddings(entity_tokens)
         return ea_embeds
