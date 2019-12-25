@@ -5,6 +5,7 @@ import itertools as it
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 from transformers import BertTokenizer, BertModel
 
 from bert.bert_orm import Sentence
@@ -21,7 +22,8 @@ class PrecomputedBert:
         self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
         self.bert = BertModel.from_pretrained('bert-base-uncased')
         self.embeddings = utils.get_bert_embeddings()
-        self.engine = create_engine(database_path)
+        self.engine = create_engine(database_path,
+                                    connect_args={'check_same_thread':False})
         self.cache = dict()
         Session = sessionmaker(bind=self.engine)
         self.session = Session()
