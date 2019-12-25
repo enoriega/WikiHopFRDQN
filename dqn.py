@@ -190,7 +190,12 @@ class BQN(BaseApproximator):
         self.config = BertConfig.from_pretrained('bert-base-uncased')
         super().__init__(num_feats, zero_init_params)
         self.bert_helper = helper
-        self.tokenizer = helper.tokenizer
+        # self.tokenizer = helper.tokenizer
+
+        # embeddings_matrix = list(utils.get_bert_embeddings().parameters())[0]
+        # Do PCA on the embeddings to take the top 50 components
+        # embeddings_matrix = utils.pca(embeddings_matrix, 50)
+        # self.embeddings = nn.EmbeddingBag.from_pretrained(embeddings_matrix, mode='mean')
 
         self.entity_types = {w: torch.tensor(ix, device=self.device) for ix, w in
                              enumerate(['UNK', 'Person', 'Location', 'Organization', 'CommonNoun'])}
