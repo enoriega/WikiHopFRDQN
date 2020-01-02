@@ -84,7 +84,7 @@ def zero_init(m):
 class BaseApproximator(nn.Module):
     def __init__(self, num_feats, zero_init_params=False, device="cpu"):
         super().__init__()
-        self.cache = Cache()
+        self.cache = Cache(size=1000)
         self.num_feats = num_feats
 
         self.device = device
