@@ -10,6 +10,7 @@ from transformers import *
 import utils
 # from bert.bert_orm import entity_origin_to_embeddings
 from bert.PrecomputedBert import PrecomputedBert
+from cache import Cache
 
 logging.basicConfig(filename='app.log', filemode='w', level=logging.DEBUG, format='%(name)s - %(levelname)s - %(message)s')
 # logging.warning('This will get logged to a file')
@@ -21,7 +22,7 @@ def death_gradient(parameters):
 
 
 # noinspection PyArgumentList
-def process_input_data(datum):
+def process_input_data(datum:dict):
     """Converts a state datum into a sequence of features ready to be passed to the network"""
     # First, compute cartesian product of the candidate entities
     candidate_entities = [frozenset(e) for e in datum['candidates']]
@@ -83,7 +84,7 @@ def zero_init(m):
 class BaseApproximator(nn.Module):
     def __init__(self, num_feats, zero_init_params=False, device="cpu"):
         super().__init__()
-
+        self.cache = Cache()
         self.num_feats = num_feats
 
         self.device = device
@@ -101,13 +102,13 @@ class BaseApproximator(nn.Module):
 
         # Parse the data
         data = [d for d in data if len(set(frozenset(e) for e in d['new_state']['candidates'])) > 1]
-        states, actions, rewards, next_states = zip(*(d.values() for d in data))
+        states, states_ids, actions, rewards, next_states, next_state_ids = zip(*(d.values() for d in data))
         self.eval()
-        action_values = self(states)
+        action_values = self(states, ids=states_ids)
         self.train()
         # The next_action_values computation is tricky, as it involves looking at many possible states
         with torch.no_grad():
-            pairs, next_action_values = self.select_action(next_states)
+            pairs, next_action_values = self.select_action(next_states, ids=next_state_ids)
 
         # updates = [r + gamma * q.max() for r, q in zip(rewards, next_action_values.detach())]
         # This change shortcuts the update to not account for the next action state when the reward is observed, because
@@ -124,22 +125,33 @@ class BaseApproximator(nn.Module):
 
         return loss
 
-    def select_action(self, data):
+    def select_action(self, data, ids=list()):
 
         ret_tensors = list()
         ret_pairs = list()
 
         all_inputs = list()
+        all_inputs_ids = list()
         instance_indices = list()
         instance_candidate_pairs = list()
 
-        for ix, d in enumerate(data):
-            inputs, candidate_pairs = process_input_data(d)
+        for ix, (d, identifier) in enumerate(it.zip_longest(data, ids, fillvalue=None)):
+            if identifier is not None and identifier in self.cache:
+                inputs, candidate_pairs, inputs_ids = self.cache[identifier]
+            else:
+                inputs, candidate_pairs = process_input_data(d)
+                inputs_ids = list()
+                if identifier is not None:
+                    inputs_ids = ["%s-%i" % (identifier, input_ix) for input_ix in range(len(inputs))]
+                    self.cache[identifier] = (inputs, candidate_pairs, inputs_ids)
+
             instance_candidate_pairs.append(candidate_pairs)
             all_inputs.extend(inputs)
+            all_inputs_ids.extend(inputs_ids)
+
             instance_indices.extend(it.repeat(ix, len(inputs)))
 
-        action_values = self(all_inputs)
+        action_values = self(all_inputs, ids=all_inputs_ids)
 
         # Create slice views of the tensors
         groups = it.groupby(enumerate(instance_indices), lambda t: t[1])
@@ -211,7 +223,7 @@ class BQN(BaseApproximator):
             nn.Dropout(p=0.2)
         )
 
-    def forward(self, data):
+    def forward(self, data, ids=list()):
         # Parse the input data into tensor form
 
         # Convert the raw data to tensor form
@@ -220,30 +232,39 @@ class BQN(BaseApproximator):
         sorted_features = list(sorted(data[0]['features']))
 
         # Create an input vector for each of the elements in data
-        for datum in data:
-            with torch.no_grad():
-                # Get the raw input
-                features = datum['features']
-                entity_a = datum['A']
-                entity_b = datum['B']
-                origins_a = datum['originsA']
-                origins_b = datum['originsB']
-
-                ea_embeds = self.get_embeddings(entity_a, origins_a)
-                ea_embeds = ea_embeds.sum(dim=0)
-                ea_embeds /= ea_embeds.norm().detach()
-
-                eb_embeds = self.get_embeddings(entity_b, origins_b)
-                eb_embeds = eb_embeds.sum(dim=0)
-                eb_embeds /= eb_embeds.norm().detach()
-
-                embeds = torch.cat([ea_embeds, eb_embeds])
+        for datum, identifier in it.zip_longest(data, ids, fillvalue=None):
+            if identifier is not None and identifier in self.cache:
+                embeds, features = self.cache[identifier]
                 batch_embeds.append(embeds)
+                batch_features.append(features)
+            else:
+                with torch.no_grad():
+                    # Get the raw input
+                    features = datum['features']
+                    entity_a = datum['A']
+                    entity_b = datum['B']
+                    origins_a = datum['originsA']
+                    origins_b = datum['originsB']
 
-                # Build a vector out of the numerical features, sorted by feature name
-                f = [float(features[k]) for k in sorted_features]
-                f = torch.tensor(f, device=self.device)
-                batch_features.append(f)
+                    ea_embeds = self.get_embeddings(entity_a, origins_a)
+                    ea_embeds = ea_embeds.sum(dim=0)
+                    ea_embeds /= ea_embeds.norm().detach()
+
+                    eb_embeds = self.get_embeddings(entity_b, origins_b)
+                    eb_embeds = eb_embeds.sum(dim=0)
+                    eb_embeds /= eb_embeds.norm().detach()
+
+                    embeds = torch.cat([ea_embeds, eb_embeds]).detach()
+                    batch_embeds.append(embeds)
+
+                    # Build a vector out of the numerical features, sorted by feature name
+                    f = [float(features[k]) for k in sorted_features]
+                    f = torch.tensor(f, device=self.device)
+                    batch_features.append(f)
+
+                    # Store in the cache the precomputed results
+                    if identifier is not None:
+                        self.cache[identifier] = (embeds, f)
 
         # Use the combination function of the entity embeddings
         comb = self.combinator(torch.stack(batch_embeds))
