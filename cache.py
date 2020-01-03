@@ -1,3 +1,4 @@
+
 class Cache:
 
     def __init__(self, size=100000):
