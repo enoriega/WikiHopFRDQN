@@ -12,7 +12,7 @@ import utils
 from bert.PrecomputedBert import PrecomputedBert
 from cache import Cache
 
-logging.basicConfig(filename='app.log', filemode='w', level=logging.DEBUG, format='%(name)s - %(levelname)s - %(message)s')
+# logging.basicConfig(filename='app.log', filemode='w', level=logging.DEBUG, format='%(name)s - %(levelname)s - %(message)s')
 # logging.warning('This will get logged to a file')
 
 

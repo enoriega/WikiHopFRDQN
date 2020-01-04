@@ -1,17 +1,28 @@
 import os
 import json
+import sys
+
 import torch
 import yaml
 import torch.optim as optim
 from flask import Flask, request
 from transformers import BertConfig
+from werkzeug.contrib.profiler import MergeStream
 
 import dqn
 from bert.PrecomputedBert import PrecomputedBert
 from dqn import DQN, LinearQN, MLP, BQN
 from embeddings import EmbeddingsHelper
+from werkzeug.middleware.profiler import ProfilerMiddleware
+
+f = open('profiler.log', 'w')
+stream = MergeStream(sys.stdout, f)
 
 app = Flask(__name__)
+
+app.config['PROFILE'] = True
+app.wsgi_app = ProfilerMiddleware(app.wsgi_app, stream, restrictions=[50])
+app.run(debug = True)
 
 with open('config.yml') as f:
     cfg = yaml.load(f, Loader=yaml.FullLoader)
