@@ -57,7 +57,8 @@ if __name__ == "__main__":
     ser = Serializer()
     # Load bert
     bert = BertModel.from_pretrained('bert-base-uncased')
-    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+    tokenizer = \
+        BertTokenizerFast.from_pretrained('bert-base-uncased')
     # Set the model to eval mode
     bert.eval()
     # Don't keep track of the gradients

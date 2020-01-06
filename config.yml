@@ -5,6 +5,7 @@ embeddings:
 bert:
   sentences_path: 'sentences_w_relations_new.tsv'
   database_path: 'sqlite:////Volumes/My Passport/test2.sqlite'
+#  database_path: 'postgresql://wikihopfr:wikihopfr@localhost:5432/wikihopbert'
 model_dir: "."
 device: "cpu"
 

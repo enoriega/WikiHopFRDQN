@@ -136,6 +136,7 @@ def backwards():
                 param.grad.data.clamp_(-1, 1)
         trainer.step()
 
+        del loss
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 

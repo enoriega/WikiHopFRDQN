@@ -6,7 +6,7 @@ import itertools as it
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-from transformers import BertTokenizer, BertModel
+from transformers import BertTokenizerFast, BertModel
 
 from bert.bert_orm import Sentence
 from bert.berter import parse_sentences
@@ -19,7 +19,7 @@ class PrecomputedBert:
         original_sentences = parse_sentences(sentences_path)
         self.os = {(v.doc, v.sentence): v.text.split() for v in
                    it.chain.from_iterable(x[1] for x in original_sentences)}
-        self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        self.tokenizer = BertTokenizerFast.from_pretrained('bert-base-uncased')
         self.bert = BertModel.from_pretrained('bert-base-uncased')
         self.embeddings = utils.get_bert_embeddings()
         self.engine = create_engine(database_path,
