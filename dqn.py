@@ -287,6 +287,11 @@ class BQN(BaseApproximator):
             ea_embeds = self.bert_helper.entity_to_embeddings(entity_tokens)
         return ea_embeds
 
+    def backprop(self, data, gamma=0.9, alpha=1.0):
+        loss = super().backprop(data, gamma, alpha)
+        self.bert_helper.clear_cache()
+        return loss
+
 
 class DQN(BaseApproximator):
 

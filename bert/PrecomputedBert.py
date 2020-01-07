@@ -28,6 +28,9 @@ class PrecomputedBert:
         Session = sessionmaker(bind=self.engine)
         self.session = Session()
 
+    def clear_cache(self):
+        self.session.expire_all()
+
     def entity_to_embeddings(self, e):
         """ Runs the entity through bert """
         tokenizer = self.tokenizer
