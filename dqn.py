@@ -1,19 +1,18 @@
 import itertools as it
 from abc import abstractmethod
 
-import logging
+import numpy as np
 import torch
 import torch.nn.functional as F
 from torch import nn
-import numpy as np
 from transformers import *
-import utils
+
 # from bert.bert_orm import entity_origin_to_embeddings
-from bert.PrecomputedBert import PrecomputedBert
 from cache import Cache
 
-# logging.basicConfig(filename='app.log', filemode='w', level=logging.DEBUG, format='%(name)s - %(levelname)s - %(message)s')
-# logging.warning('This will get logged to a file')
+
+# import logging logging.basicConfig(filename='app.log', filemode='w', level=logging.DEBUG, format='%(name)s - %(
+# levelname)s - %(message)s') logging.warning('This will get logged to a file')
 
 
 def death_gradient(parameters):
@@ -223,6 +222,31 @@ class BQN(BaseApproximator):
             nn.Dropout(p=0.2)
         )
 
+    def make_input(self, datum, sorted_features):
+        with torch.no_grad():
+            # Get the raw input
+            features = datum['features']
+            entity_a = datum['A']
+            entity_b = datum['B']
+            origins_a = datum['originsA']
+            origins_b = datum['originsB']
+
+            ea_embeds = self.get_embeddings(entity_a, origins_a)
+            ea_embeds = ea_embeds.sum(dim=0)
+            ea_embeds /= ea_embeds.norm().detach()
+
+            eb_embeds = self.get_embeddings(entity_b, origins_b)
+            eb_embeds = eb_embeds.sum(dim=0)
+            eb_embeds /= eb_embeds.norm().detach()
+
+            embeds = torch.cat([ea_embeds, eb_embeds]).detach()
+
+            # Build a vector out of the numerical features, sorted by feature name
+            f = [float(features[k]) for k in sorted_features]
+            f = torch.tensor(f, device=self.device)
+
+            return embeds, f
+
     def forward(self, data, ids=list()):
         # Parse the input data into tensor form
 
@@ -238,33 +262,37 @@ class BQN(BaseApproximator):
                 batch_embeds.append(embeds)
                 batch_features.append(features)
             else:
-                with torch.no_grad():
-                    # Get the raw input
-                    features = datum['features']
-                    entity_a = datum['A']
-                    entity_b = datum['B']
-                    origins_a = datum['originsA']
-                    origins_b = datum['originsB']
+                # with torch.no_grad():
+                #     # Get the raw input
+                #     features = datum['features']
+                #     entity_a = datum['A']
+                #     entity_b = datum['B']
+                #     origins_a = datum['originsA']
+                #     origins_b = datum['originsB']
+                #
+                #     ea_embeds = self.get_embeddings(entity_a, origins_a)
+                #     ea_embeds = ea_embeds.sum(dim=0)
+                #     ea_embeds /= ea_embeds.norm().detach()
+                #
+                #     eb_embeds = self.get_embeddings(entity_b, origins_b)
+                #     eb_embeds = eb_embeds.sum(dim=0)
+                #     eb_embeds /= eb_embeds.norm().detach()
+                #
+                #     embeds = torch.cat([ea_embeds, eb_embeds]).detach()
+                #     batch_embeds.append(embeds)
+                #
+                #     # Build a vector out of the numerical features, sorted by feature name
+                #     f = [float(features[k]) for k in sorted_features]
+                #     f = torch.tensor(f, device=self.device)
+                #     batch_features.append(f)
 
-                    ea_embeds = self.get_embeddings(entity_a, origins_a)
-                    ea_embeds = ea_embeds.sum(dim=0)
-                    ea_embeds /= ea_embeds.norm().detach()
+                embeds, f = self.make_input(datum, sorted_features)
+                batch_embeds.append(embeds)
+                batch_features.append(f)
 
-                    eb_embeds = self.get_embeddings(entity_b, origins_b)
-                    eb_embeds = eb_embeds.sum(dim=0)
-                    eb_embeds /= eb_embeds.norm().detach()
-
-                    embeds = torch.cat([ea_embeds, eb_embeds]).detach()
-                    batch_embeds.append(embeds)
-
-                    # Build a vector out of the numerical features, sorted by feature name
-                    f = [float(features[k]) for k in sorted_features]
-                    f = torch.tensor(f, device=self.device)
-                    batch_features.append(f)
-
-                    # Store in the cache the precomputed results
-                    if identifier is not None:
-                        self.cache[identifier] = (embeds, f)
+                # Store in the cache the precomputed results
+                if identifier is not None:
+                    self.cache[identifier] = (embeds, f)
 
         # Use the combination function of the entity embeddings
         comb = self.combinator(torch.stack(batch_embeds))
@@ -279,6 +307,7 @@ class BQN(BaseApproximator):
         if len(entity_origins) > 0:
             try:
                 ea_embeds = self.bert_helper.entity_origin_to_embeddings(entity_origins[0])
+                ea_embeds = torch.from_numpy(np.stack(ea_embeds))
                 logging.debug("Successful fetch")
             except Exception as e:
                 ea_embeds = self.bert_helper.entity_to_embeddings(entity_tokens)

@@ -5,7 +5,6 @@ import itertools as it
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 from transformers import BertTokenizerFast, BertModel
 
 from bert.bert_orm import Sentence
@@ -92,17 +91,18 @@ class PrecomputedBert:
 
     def fetch_embeddings(self, doc: str, sen: int, start: int, end: int):
         """ Does the actual SQLAlchemy query to fetch the contextualized embeddings """
-        # data = self.session.query(Sentence). \
-        #     filter(Sentence.doc == doc). \
-        #     filter(Sentence.index == sen).first()
-        #
-        # hidden_states = data.states[start:end]
-        #
-        # ret = [hs.vector.data for hs in hidden_states]
-        #
-        # ret = torch.from_numpy(np.stack(ret))
+        data = self.session.query(Sentence). \
+            filter(Sentence.doc == doc). \
+            filter(Sentence.index == sen).first()
 
-        return torch.rand([3, 768])
+        hidden_states = data.states[start:end]
+
+        ret = [hs.vector.data for hs in hidden_states]
+
+        return ret
+        ret = torch.from_numpy(np.stack(ret))
+
+        # return torch.rand([3, 768])
 
     def close(self):
         """ Frees the SQLAlchemy session """
