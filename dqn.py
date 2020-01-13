@@ -307,7 +307,6 @@ class BQN(BaseApproximator):
         if len(entity_origins) > 0:
             try:
                 ea_embeds = self.bert_helper.entity_origin_to_embeddings(entity_origins[0])
-                ea_embeds = torch.from_numpy(np.stack(ea_embeds))
                 logging.debug("Successful fetch")
             except Exception as e:
                 ea_embeds = self.bert_helper.entity_to_embeddings(entity_tokens)

@@ -99,8 +99,8 @@ class PrecomputedBert:
 
         ret = [hs.vector.data for hs in hidden_states]
 
-        return ret
         ret = torch.from_numpy(np.stack(ret))
+        return ret
 
         # return torch.rand([3, 768])
 
