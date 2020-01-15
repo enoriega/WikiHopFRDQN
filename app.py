@@ -1,28 +1,19 @@
 import os
 import json
-import sys
 
 import torch
 import yaml
 import torch.optim as optim
 from flask import Flask, request
 from transformers import BertConfig
-from werkzeug.contrib.profiler import MergeStream
 
 import dqn
 from bert.PrecomputedBert import PrecomputedBert
 from dqn import DQN, LinearQN, MLP, BQN
 from embeddings import EmbeddingsHelper
-from werkzeug.middleware.profiler import ProfilerMiddleware
 
-# f = open('profiler.log', 'w')
-# stream = MergeStream(sys.stdout, f)
 
-app = Flask(__name__)
-
-# app.config['PROFILE'] = True
-# app.wsgi_app = ProfilerMiddleware(app.wsgi_app, stream, restrictions=[50])
-# app.run(debug = True)
+wsgi = Flask(__name__)
 
 with open('config.yml') as f:
     cfg = yaml.load(f, Loader=yaml.FullLoader)
@@ -46,7 +37,7 @@ zero_init = False
 Approximator = None  # This is the default approximator class used
 
 
-@app.before_request
+@wsgi.before_request
 def configuration_hook():
     """ This is a hook that handles the configuration"""
     if 'zero_init' in request.args:
@@ -78,12 +69,12 @@ def configuration_hook():
             raise NotImplementedError("Approximator %s not implemented" % val)
 
 
-@app.route('/')
+@wsgi.route('/')
 def api_root():
     return 'Welcome to the magic of Deep Reinforcement Learning'
 
 
-@app.route('/select_action', methods=['GET', 'PUT'])
+@wsgi.route('/select_action', methods=['GET', 'PUT'])
 def select_action():
     if request.method == "PUT":
         data = json.loads(request.data)
@@ -109,7 +100,7 @@ def select_action():
         return "Use the PUT method"
 
 
-@app.route('/backwards', methods=['GET', 'PUT'])
+@wsgi.route('/backwards', methods=['GET', 'PUT'])
 def backwards():
     if request.method == "PUT":
         data = json.loads(request.data)
@@ -148,7 +139,7 @@ def backwards():
         return "Use the PUT method"
 
 
-@app.route('/distance', methods=['GET', 'PUT'])
+@wsgi.route('/distance', methods=['GET', 'PUT'])
 def distance():
     if request.method == "PUT":
         # Don't need to hold to the gradient here
@@ -163,7 +154,7 @@ def distance():
         return "Use the PUT method"
 
 
-@app.route('/save', methods=['GET', 'POST'])
+@wsgi.route('/save', methods=['GET', 'POST'])
 def save():
     if request.method == "POST":
         model_name = request.args.get("name")
@@ -181,7 +172,7 @@ def save():
         return "Use the POST method"
 
 
-@app.route('/load', methods=['GET', 'POST'])
+@wsgi.route('/load', methods=['GET', 'POST'])
 def load():
     if request.method == "POST":
         global network, Approximator
@@ -208,7 +199,7 @@ def load():
         return "Use the POST method"
 
 
-@app.route('/reset', methods=['GET'])
+@wsgi.route('/reset', methods=['GET'])
 def reset():
     global network, trainer, helper
     network = None
@@ -220,4 +211,5 @@ def reset():
 
 
 if __name__ == '__main__':
-    app.run()
+    from waitress import serve
+    serve(wsgi, listen="*:5000", threads=20)
