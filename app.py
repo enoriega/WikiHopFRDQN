@@ -1,5 +1,6 @@
 import os
 import json
+import sys
 
 import torch
 import yaml
@@ -9,13 +10,13 @@ from transformers import BertConfig
 
 import dqn
 from bert.PrecomputedBert import PrecomputedBert
-from dqn import DQN, LinearQN, MLP, BQN
+from dqn import DQN, LinearQN, MLP, BQN, BaseApproximator
 from embeddings import EmbeddingsHelper
-
 
 wsgi = Flask(__name__)
 
-with open('config.yml') as f:
+# Initialization stuff
+with open("config.yml") as f:
     cfg = yaml.load(f, Loader=yaml.FullLoader)
 
 embeddings_cfg = cfg['embeddings']
@@ -28,13 +29,14 @@ freeze_embeddings = embeddings_cfg['freeze']
 
 model_dir = cfg['model_dir']
 
-# helper = EmbeddingsHelper(glove_path, voc_path, freeze_embeddings)
+# Set up the global variables
 helper = None
 
-network = None
-trainer = None
-zero_init = False
-Approximator = None  # This is the default approximator class used
+network: BaseApproximator = None
+trainer: optim.Optimizer = None
+zero_init: bool = False
+Approximator: type = None  # This is the default approximator class used
+#########################
 
 
 @wsgi.before_request
@@ -164,8 +166,12 @@ def save():
         if not network:
             return "No model instance created yet", 503
 
-        state = network.state_dict()
-        torch.save(state, path)
+        is_debug = wsgi.config['DEBUG']
+
+        # Don't save anything if this is a debugging session
+        if not is_debug:
+            state = network.state_dict()
+            torch.save(state, path)
 
         return "Saved the model into %s" % model_name
     else:
@@ -212,4 +218,5 @@ def reset():
 
 if __name__ == '__main__':
     from waitress import serve
+
     serve(wsgi, listen="*:5000", threads=20)

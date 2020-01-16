@@ -247,9 +247,13 @@ class BQN(BaseApproximator):
 
             return embeds, f
 
-    def forward(self, data, ids=list()):
-        # Parse the input data into tensor form
+    def forward(self, data, ids=None):
 
+        # Best practice
+        if ids is None:
+            ids = list()
+
+        # Parse the input data into tensor form
         # Convert the raw data to tensor form
         batch_ids, batch_types, batch_features, batch_embeds = list(), list(), list(), list()
 
@@ -345,7 +349,7 @@ class DQN(BaseApproximator):
             nn.Linear(20, 2),
         )
 
-    def forward(self, data):
+    def forward(self, data, ids=None):
         # Parse the input data into tensor form
         batch = self.tensor_form(data)
 
@@ -400,7 +404,7 @@ class LinearQN(BaseApproximator):
             # nn.Sigmoid(),
         )
 
-    def forward(self, data):
+    def forward(self, data, ids=None):
         # Parse the input data into tensor form
         # TODO uncomment this
         batch = self.tensor_form(data)

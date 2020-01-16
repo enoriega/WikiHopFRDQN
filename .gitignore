@@ -127,3 +127,5 @@ dmypy.json
 __pycache__
 
 *.pt
+
+config.yml
