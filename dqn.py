@@ -20,57 +20,6 @@ def death_gradient(parameters):
     return np.isclose(np.zeros(gradient.shape), gradient).astype(int).sum() / float(len(gradient))
 
 
-# noinspection PyArgumentList
-def process_input_data(datum:dict):
-    """Converts a state datum into a sequence of features ready to be passed to the network"""
-    # First, compute cartesian product of the candidate entities
-    candidate_entities = [frozenset(e) for e in datum['candidates']]
-    candidate_entity_types = [e for e in datum['candidatesTypes']]
-    candidate_entity_origins = [e for e in datum['candidatesOrigins']]
-
-    ranks, iteration_introductions, entity_usage, explore_scores, exploit_scores, types, origins = {}, {}, {}, {}, {}, {}, {}
-    for ix, e in enumerate(candidate_entities):
-        ranks[e] = datum['ranks'][ix]
-        iteration_introductions[e] = datum['iterationsOfIntroduction'][ix]
-        entity_usage[e] = datum['entityUsage'][ix]
-        types[e] = candidate_entity_types[ix]
-        origins[e] = candidate_entity_origins[ix]
-
-    exploit_scores = datum['exploitScores']
-    explore_scores = datum['exploreScores']
-    same_components = datum['sameComponents']
-
-    # Filter out a pair if they are the same entity
-    candidate_pairs = [(a, b) for a, b in it.product(candidate_entities, candidate_entities) if a != b]
-    features = datum['features']
-
-    inputs = []
-    for ix, (a, b) in enumerate(candidate_pairs):
-        new_features = {
-            'log_count_a': entity_usage[a],
-            'log_count_b': entity_usage[b],
-            'intro_a': iteration_introductions[a],
-            'intro_b': iteration_introductions[b],
-            'rank_a': ranks[a],
-            'rank_b': ranks[b],
-            'explore_score': explore_scores[ix],
-            'exploit_score': exploit_scores[ix],
-            'same_component': same_components[ix],
-        }
-
-        typeA = 'UNK' if len(types[a]) == 0 else types[a][0]
-        typeB = 'UNK' if len(types[b]) == 0 else types[b][0]
-
-        originsA = origins[a]
-        originsB = origins[b]
-
-        inputs.append({'features': {**features, **new_features}, 'A': a, 'B': b,
-                       'typeA': typeA, 'typeB': typeB,
-                       'originsA': originsA, 'originsB': originsB})
-
-    return inputs, candidate_pairs
-
-
 def zero_init(m):
     """Initializes the parameters of a module to Zero"""
 
@@ -99,71 +48,33 @@ class BaseApproximator(nn.Module):
 
     def backprop(self, data, gamma=0.9, alpha=1.0):
 
-        # Parse the data
-        data = [d for d in data if len(set(frozenset(e) for e in d['new_state']['candidates'])) > 1]
-        states, states_ids, actions, rewards, next_states, next_state_ids = zip(*(d.values() for d in data))
+        state = data['state']
+        action = data['action']
+        reward = data['reward']
+        next_state = data['next_state']
+        next_action = data['next_action']
+
         self.eval()
-        action_values = self(states, ids=states_ids)
+        action_values = self(torch.FloatTensor([state[k] for k in sorted(state)]))
         self.train()
         # The next_action_values computation is tricky, as it involves looking at many possible states
         with torch.no_grad():
-            pairs, next_action_values = self.select_action(next_states, ids=next_state_ids)
+            next_action_values = self(torch.FloatTensor([next_state[k] for k in sorted(next_state)]))
 
         # updates = [r + gamma * q.max() for r, q in zip(rewards, next_action_values.detach())]
         # This change shortcuts the update to not account for the next action state when the reward is observed, because
         # this is when the transition was to the final state, which by definition has a value of zero
-        updates = [r if r != 0 else r + gamma * q.max() for r, q in zip(rewards, next_action_values.detach())]
+        update = reward if reward != 0 else reward + gamma * next_action_values.max()
 
         target_values = action_values.clone().detach()
 
-        for row_ix, action in enumerate(actions):
-            col_ix = 0 if action == "exploration" else 1
-            target_values[row_ix, col_ix] += (alpha * (updates[row_ix] - target_values[row_ix, col_ix]))
+        col_ix = 0 if action == "exploration" else 1
+        target_values[col_ix] += (alpha * (update - target_values[col_ix]))
 
         loss = F.mse_loss(action_values, target_values)
 
         return loss
 
-    def select_action(self, data, ids=list()):
-
-        ret_tensors = list()
-        ret_pairs = list()
-
-        all_inputs = list()
-        all_inputs_ids = list()
-        instance_indices = list()
-        instance_candidate_pairs = list()
-
-        for ix, (d, identifier) in enumerate(it.zip_longest(data, ids, fillvalue=None)):
-            if identifier is not None and identifier in self.cache:
-                inputs, candidate_pairs, inputs_ids = self.cache[identifier]
-            else:
-                inputs, candidate_pairs = process_input_data(d)
-                inputs_ids = list()
-                if identifier is not None:
-                    inputs_ids = ["%s-%i" % (identifier, input_ix) for input_ix in range(len(inputs))]
-                    self.cache[identifier] = (inputs, candidate_pairs, inputs_ids)
-
-            instance_candidate_pairs.append(candidate_pairs)
-            all_inputs.extend(inputs)
-            all_inputs_ids.extend(inputs_ids)
-
-            instance_indices.extend(it.repeat(ix, len(inputs)))
-
-        action_values = self(all_inputs, ids=all_inputs_ids)
-
-        # Create slice views of the tensors
-        groups = it.groupby(enumerate(instance_indices), lambda t: t[1])
-        for instance_num, g in groups:
-            indices = [t[0] for t in g]
-            tensor_slice = action_values[indices, :]
-            # Compute the row with the highest index
-            row_ix = tensor_slice.max(dim=1).values.argmax()
-            row = tensor_slice[row_ix, :]
-            ret_tensors.append(row)
-            ret_pairs.append(instance_candidate_pairs[instance_num][row_ix])
-
-        return ret_pairs, torch.cat(ret_tensors).view((len(ret_tensors), -1))
 
     @staticmethod
     def raw2json(raw_vals):
@@ -404,45 +315,9 @@ class LinearQN(BaseApproximator):
             # nn.Sigmoid(),
         )
 
-    def forward(self, data, ids=None):
-        # Parse the input data into tensor form
-        # TODO uncomment this
-        batch = self.tensor_form(data)
-
-        # Feed the batch  through the network's layers
-        # batch = data
-        return self.forward_raw(batch)
-
-    def forward_raw(self, batch):
-        values = self.layers(batch)
+    def forward(self, data):
+        values = self.layers(data)
         return values
-
-    def tensor_form(self, data):
-        """
-            This is an overridden version that ignores the entities (doesn't fetch their embeddings)
-        """
-        # Convert the raw data to tensor form
-        batch = list()
-
-        sorted_features = list(sorted(data[0]['features']))
-
-        # Create an input vector for each of the elements in data
-        for datum in data:
-            # Get the raw input
-            features = datum['features']
-
-            # Build a vector out of the numerical features, sorted by feature name
-            f = [features[k] for k in sorted_features]
-            f = torch.FloatTensor(f, device=self.device)
-
-            # Store it into a list
-            batch.append(f)
-
-        # Create an input matrix from all the elements (the batch)
-        input_dim = batch[0].shape[0]
-        batch = torch.cat(batch).view((len(batch), input_dim))
-
-        return batch
 
 
 class MLP(LinearQN):

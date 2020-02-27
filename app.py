@@ -85,8 +85,7 @@ def select_action():
         # This is necessary to compute the number features dynamically
         global network
         if not network:
-            new_state, _ = dqn.process_input_data(data[0])
-            k = len(new_state[0]['features'])
+            k = len(data)
             network = Approximator(k, helper, zero_init, device=device)
             if torch.cuda.is_available():
                 network = network.cuda()
@@ -94,8 +93,9 @@ def select_action():
         # Don't need to hold to the gradient here
         with torch.no_grad():
             network.eval()
-            pairs, values = network.select_action(data)
-            ret = [{"index": v.argmax().item(), "A": list(p[0]), "B": list(p[1])} for p, v in zip(pairs, values)]
+            tensor = torch.FloatTensor([data[k] for k in sorted(data)])
+            values = network(tensor)
+            ret = values.tolist()
 
         return json.dumps(ret)
     else:
@@ -108,8 +108,7 @@ def backwards():
         data = json.loads(request.data)
         global network
         if not network:
-            new_state, _ = dqn.process_input_data(data[0]['new_state'])
-            k = len(new_state[0]['features'])
+            k = len(data)
             network = Approximator(k, helper, zero_init_params=zero_init, device=device)
             if torch.cuda.is_available():
                 network = network.cuda()
@@ -141,19 +140,6 @@ def backwards():
         return "Use the PUT method"
 
 
-@wsgi.route('/distance', methods=['GET', 'PUT'])
-def distance():
-    if request.method == "PUT":
-        # Don't need to hold to the gradient here
-        with torch.no_grad():
-            data = json.loads(request.data)
-            pairs = [(d["A"], d["B"]) for d in data]
-            dists = helper.distance(pairs)
-
-        return json.dumps(dists)
-
-    else:
-        return "Use the PUT method"
 
 
 @wsgi.route('/save', methods=['GET', 'POST'])

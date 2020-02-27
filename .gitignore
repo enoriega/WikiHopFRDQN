@@ -129,3 +129,4 @@ __pycache__
 *.pt
 
 config.yml
+sentences_w_relations_new.tsv
