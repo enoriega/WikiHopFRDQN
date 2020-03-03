@@ -14,6 +14,8 @@ from cache import Cache
 # import logging logging.basicConfig(filename='app.log', filemode='w', level=logging.DEBUG, format='%(name)s - %(
 # levelname)s - %(message)s') logging.warning('This will get logged to a file')
 
+EXPLORATION = 0
+EXPLOITATION = 1
 
 def death_gradient(parameters):
     gradient = np.row_stack([p.grad.numpy().reshape(-1, 1) for p in parameters if p.grad is not None])
@@ -68,10 +70,10 @@ class BaseApproximator(nn.Module):
 
         target_values = action_values.clone().detach()
 
-        col_ix = 0 if action == "exploration" else 1
-        target_values[col_ix] += (alpha * (update - target_values[col_ix]))
+        # target_values[col_ix] += (alpha * (update - target_values[col_ix]))
+        target_values[action] = update
 
-        loss = F.mse_loss(action_values, target_values)
+        loss = F.smooth_l1_loss(action_values, target_values)
 
         return loss
 

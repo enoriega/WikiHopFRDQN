@@ -36,6 +36,7 @@ network: BaseApproximator = None
 trainer: optim.Optimizer = None
 zero_init: bool = False
 Approximator: type = None  # This is the default approximator class used
+prev_grad = dict()
 #########################
 
 
@@ -123,10 +124,23 @@ def backwards():
         # Optimize the model
         trainer.zero_grad()
         loss.backward()
-        for param in network.parameters():
+        current_grad = dict()
+        for ix, param in enumerate(network.parameters()):
             if param.grad is not None:
                 param.grad.data.clamp_(-1, 1)
+                current_grad[ix] = param.grad.data
         trainer.step()
+
+        # Record the change in the gradient
+        change = 0
+        global prev_grad
+        for key in current_grad:
+            if key not in prev_grad:
+                change += current_grad[key].sum().item()
+            else:
+                change += (prev_grad[key] - current_grad[key]).sum().item()
+
+        prev_grad = current_grad
 
         del loss
         if torch.cuda.is_available():
@@ -134,7 +148,7 @@ def backwards():
 
         # print("Death gradients: %f" % dqn.death_gradient(network.parameters()))
 
-        return "Performed a back propagation step"
+        return str(change)
 
     else:
         return "Use the PUT method"
@@ -193,9 +207,10 @@ def load():
 
 @wsgi.route('/reset', methods=['GET'])
 def reset():
-    global network, trainer, helper
+    global network, trainer, helper, prev_grad
     network = None
     trainer = None
+    prev_grad = dict()
 
     # helper = EmbeddingsHelper(glove_path, voc_path)
 
