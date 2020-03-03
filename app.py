@@ -37,6 +37,8 @@ trainer: optim.Optimizer = None
 zero_init: bool = False
 Approximator: type = None  # This is the default approximator class used
 prev_grad = dict()
+
+
 #########################
 
 
@@ -154,8 +156,6 @@ def backwards():
         return "Use the PUT method"
 
 
-
-
 @wsgi.route('/save', methods=['GET', 'POST'])
 def save():
     if request.method == "POST":
@@ -207,10 +207,11 @@ def load():
 
 @wsgi.route('/reset', methods=['GET'])
 def reset():
-    global network, trainer, helper, prev_grad
+    global network, trainer, helper, prev_grad, Approximator
     network = None
     trainer = None
     prev_grad = dict()
+    Approximator = None
 
     # helper = EmbeddingsHelper(glove_path, voc_path)
 

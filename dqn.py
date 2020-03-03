@@ -332,8 +332,12 @@ class MLP(LinearQN):
         return nn.Sequential(
             nn.Linear(num_feats, 100),
             nn.LeakyReLU(),
+            nn.Dropout(),
             nn.Linear(100, 20),
             nn.LeakyReLU(),
-            nn.Linear(20, 2),
-            # nn.Sigmoid(),
+            nn.Dropout(),
+            nn.Linear(20, 10),
+            nn.LeakyReLU(),
+            nn.Dropout(),
+            nn.Linear(10, 2),
         )
