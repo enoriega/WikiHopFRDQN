@@ -37,6 +37,7 @@ trainer: optim.Optimizer = None
 zero_init: bool = False
 Approximator: type = None  # This is the default approximator class used
 prev_grad = dict()
+last_loss = None
 
 
 #########################
@@ -144,6 +145,9 @@ def backwards():
 
         prev_grad = current_grad
 
+        global last_loss
+        last_loss = loss.item()
+
         del loss
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
@@ -154,6 +158,15 @@ def backwards():
 
     else:
         return "Use the PUT method"
+
+
+@wsgi.route('/last_loss', methods=['GET'])
+def get_loss():
+    global last_loss
+    if last_loss:
+        return str(last_loss)
+    else:
+        "N/A"
 
 
 @wsgi.route('/save', methods=['GET', 'POST'])
@@ -211,7 +224,7 @@ def reset():
     network = None
     trainer = None
     prev_grad = dict()
-    Approximator = None
+    # Approximator = None
 
     # helper = EmbeddingsHelper(glove_path, voc_path)
 
