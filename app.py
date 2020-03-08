@@ -89,7 +89,7 @@ def select_action():
         # This is necessary to compute the number features dynamically
         global network
         if not network:
-            k = len(data)
+            k = len(list(filter(lambda key: "Lemma_" not in key, data.keys())))
             network = Approximator(k, helper, zero_init, device=device)
             if torch.cuda.is_available():
                 network = network.cuda()
@@ -97,7 +97,7 @@ def select_action():
         # Don't need to hold to the gradient here
         with torch.no_grad():
             network.eval()
-            tensor = torch.FloatTensor([data[k] for k in sorted(data)])
+            tensor = torch.FloatTensor([data[k] for k in sorted(data) if "Lemma_" not in k]) # TODO Factorize the data to tensor into a function
             values = network(tensor)
             ret = values.tolist()
 

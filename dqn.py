@@ -57,11 +57,11 @@ class BaseApproximator(nn.Module):
         next_action = data['next_action']
 
         self.eval()
-        action_values = self(torch.FloatTensor([state[k] for k in sorted(state)]))
+        action_values = self(torch.FloatTensor([state[k] for k in sorted(state)])) # TODO Factorize the data to tensor into a function
         self.train()
         # The next_action_values computation is tricky, as it involves looking at many possible states
         with torch.no_grad():
-            next_action_values = self(torch.FloatTensor([next_state[k] for k in sorted(next_state)]))
+            next_action_values = self(torch.FloatTensor([next_state[k] for k in sorted(next_state)])) # TODO Factorize the data to tensor into a function
 
         # updates = [r + gamma * q.max() for r, q in zip(rewards, next_action_values.detach())]
         # This change shortcuts the update to not account for the next action state when the reward is observed, because
