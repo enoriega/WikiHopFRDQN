@@ -10,12 +10,12 @@ from transformers import *
 # from bert.bert_orm import entity_origin_to_embeddings
 from cache import Cache
 
-
 # import logging logging.basicConfig(filename='app.log', filemode='w', level=logging.DEBUG, format='%(name)s - %(
 # levelname)s - %(message)s') logging.warning('This will get logged to a file')
 
 EXPLORATION = 0
 EXPLOITATION = 1
+
 
 def death_gradient(parameters):
     gradient = np.row_stack([p.grad.numpy().reshape(-1, 1) for p in parameters if p.grad is not None])
@@ -48,6 +48,10 @@ class BaseApproximator(nn.Module):
     def build_layers(self, num_feats):
         pass
 
+    @abstractmethod
+    def dictionary2Tensor(self, data):
+        pass
+
     def backprop(self, data, gamma=0.9, alpha=1.0):
 
         state = data['state']
@@ -57,11 +61,11 @@ class BaseApproximator(nn.Module):
         next_action = data['next_action']
 
         self.eval()
-        action_values = self(torch.FloatTensor([state[k] for k in sorted(state)])) # TODO Factorize the data to tensor into a function
+        action_values = self(self.dictionary2Tensor(state))  # TODO Factorize the data to tensor into a function
         self.train()
         # The next_action_values computation is tricky, as it involves looking at many possible states
         with torch.no_grad():
-            next_action_values = self(torch.FloatTensor([next_state[k] for k in sorted(next_state)])) # TODO Factorize the data to tensor into a function
+            next_action_values = self(self.dictionary2Tensor(next_state))  # TODO Factorize the data to tensor into a function
 
         # updates = [r + gamma * q.max() for r, q in zip(rewards, next_action_values.detach())]
         # This change shortcuts the update to not account for the next action state when the reward is observed, because
@@ -76,7 +80,6 @@ class BaseApproximator(nn.Module):
         loss = F.smooth_l1_loss(action_values, target_values)
 
         return loss
-
 
     @staticmethod
     def raw2json(raw_vals):
@@ -127,7 +130,7 @@ class BQN(BaseApproximator):
         self.emb_dropout = nn.Dropout(p=0.2)
 
         self.combinator = nn.Sequential(
-            nn.Linear(self.config.hidden_size*2, self.config.hidden_size),
+            nn.Linear(self.config.hidden_size * 2, self.config.hidden_size),
             nn.Tanh(),
             nn.Dropout(p=0.2),
             nn.Linear(self.config.hidden_size, 200),
@@ -310,6 +313,7 @@ class LinearQN(BaseApproximator):
 
     def __init__(self, num_feats, helper, zero_init_params, device):
         super().__init__(num_feats, zero_init_params, device)
+        self.embeddings = helper
 
     def build_layers(self, num_feats):
         return nn.Sequential(
@@ -320,6 +324,31 @@ class LinearQN(BaseApproximator):
     def forward(self, data):
         values = self.layers(data)
         return values
+
+    def dictionary2Tensor(self, data):
+        features = [data[k] for k in sorted(data) if "Lemma_" not in k]
+
+        def groupParticipantFeatures(data, prefix):
+            keys = sorted(filter(lambda k: k.startswith(prefix), data))
+            groupedKeys = it.groupby(keys, key=lambda k: k.split("_")[1])
+
+            lemmas = list()
+            for group, values in groupedKeys:
+                indices = [int(data[k]) for k in values]
+                lemmas.append(indices)
+
+            return lemmas
+
+        paIndices = groupParticipantFeatures(data, "paLemma")
+        paIndices = [torch.tensor([pa]) for pa in paIndices]
+        pbIndices = groupParticipantFeatures(data, "pbLemma")
+        pbIndices = [torch.tensor([pb]) for pb in pbIndices]
+
+        pa = torch.cat([self.embeddings(ix) for ix in paIndices]).mean(dim=0)
+        pb = torch.cat([self.embeddings(ix) for ix in pbIndices]).mean(dim=0)
+
+
+        return torch.cat([torch.FloatTensor(features), pa, pb])
 
 
 class MLP(LinearQN):

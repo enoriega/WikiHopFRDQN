@@ -4,6 +4,15 @@ import itertools as it
 from torch import nn
 
 
+def load_embeddings_matrix(path):
+    # Load the embeddings matrix
+    with open(path) as f:
+        lines = [l for ix, l in enumerate(f) if ix > 0]
+
+    data = [[float(d) for d in t[1:]] for t in (l.split() for l in lines)]
+    matrix = torch.FloatTensor(data)
+    return matrix
+
 class EmbeddingsHelper:
 
     def __init__(self, data_path, voc_path, freeze=False):

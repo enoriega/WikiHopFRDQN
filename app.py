@@ -11,7 +11,7 @@ from transformers import BertConfig
 import dqn
 from bert.PrecomputedBert import PrecomputedBert
 from dqn import DQN, LinearQN, MLP, BQN, BaseApproximator
-from embeddings import EmbeddingsHelper
+from embeddings import EmbeddingsHelper, load_embeddings_matrix
 
 wsgi = Flask(__name__)
 
@@ -60,13 +60,17 @@ def configuration_hook():
         val = request.args.get('approximator')
         if val.lower() == 'linear':
             Approximator = LinearQN
-            helper = EmbeddingsHelper(glove_path, voc_path, freeze_embeddings)
+            # helper = EmbeddingsHelper(glove_path, voc_path, freeze_embeddings)
+            matrix = load_embeddings_matrix(glove_path)
+            helper = torch.nn.EmbeddingBag.from_pretrained(matrix)
         elif val.lower() == 'dqn':
             Approximator = DQN
             helper = EmbeddingsHelper(glove_path, voc_path, freeze_embeddings)
         elif val.lower() == 'mlp':
             Approximator = MLP
-            helper = EmbeddingsHelper(glove_path, voc_path, freeze_embeddings)
+            # helper = EmbeddingsHelper(glove_path, voc_path, freeze_embeddings)
+            matrix = load_embeddings_matrix(glove_path)
+            helper = torch.nn.EmbeddingBag.from_pretrained(matrix)
         elif val.lower() == 'bqn':
             Approximator = BQN
             helper = PrecomputedBert(bert_cfg['sentences_path'], bert_cfg['database_path'])
@@ -89,7 +93,7 @@ def select_action():
         # This is necessary to compute the number features dynamically
         global network
         if not network:
-            k = len(list(filter(lambda key: "Lemma_" not in key, data.keys())))
+            k = len(list(filter(lambda key: "Lemma_" not in key, data.keys()))) + 200
             network = Approximator(k, helper, zero_init, device=device)
             if torch.cuda.is_available():
                 network = network.cuda()
@@ -97,7 +101,7 @@ def select_action():
         # Don't need to hold to the gradient here
         with torch.no_grad():
             network.eval()
-            tensor = torch.FloatTensor([data[k] for k in sorted(data) if "Lemma_" not in k]) # TODO Factorize the data to tensor into a function
+            tensor = network.dictionary2Tensor(data)
             values = network(tensor)
             ret = values.tolist()
 
@@ -112,7 +116,7 @@ def backwards():
         data = json.loads(request.data)
         global network
         if not network:
-            k = len(data)
+            k = len(data) + 200
             network = Approximator(k, helper, zero_init_params=zero_init, device=device)
             if torch.cuda.is_available():
                 network = network.cuda()
@@ -166,7 +170,7 @@ def get_loss():
     if last_loss:
         return str(last_loss)
     else:
-        "N/A"
+        "Woops"
 
 
 @wsgi.route('/save', methods=['GET', 'POST'])
