@@ -310,10 +310,13 @@ class DQN(BaseApproximator):
 
 class LinearQN(BaseApproximator):
     """This is a linear approximator that doesn't use the embeddings at all"""
+    PA_OOV = torch.tensor([0], requires_grad=False)
+    PB_OOV = torch.tensor([1], requires_grad=False)
 
     def __init__(self, num_feats, helper, zero_init_params, device):
         super().__init__(num_feats, zero_init_params, device)
         self.embeddings = helper
+        self.OOVEmbeddings = nn.Embedding(2, 100)
 
     def build_layers(self, num_feats):
         return nn.Sequential(
@@ -328,25 +331,31 @@ class LinearQN(BaseApproximator):
     def dictionary2Tensor(self, data):
         features = [data[k] for k in sorted(data) if "Lemma_" not in k]
 
-        def groupParticipantFeatures(data, prefix):
+        def group_participant_features(data, prefix):
             keys = sorted(filter(lambda k: k.startswith(prefix), data))
-            groupedKeys = it.groupby(keys, key=lambda k: k.split("_")[1])
+            grouped_keys = it.groupby(keys, key=lambda k: k.split("_")[1])
 
             lemmas = list()
-            for group, values in groupedKeys:
+            for group, values in grouped_keys:
                 indices = [int(data[k]) for k in values]
                 lemmas.append(indices)
 
             return lemmas
 
-        paIndices = groupParticipantFeatures(data, "paLemma")
-        paIndices = [torch.tensor([pa]) for pa in paIndices]
-        pbIndices = groupParticipantFeatures(data, "pbLemma")
-        pbIndices = [torch.tensor([pb]) for pb in pbIndices]
+        pa_indices = group_participant_features(data, "paLemma")
+        pa_indices = [torch.tensor([pa]) for pa in pa_indices]
+        pb_indices = group_participant_features(data, "pbLemma")
+        pb_indices = [torch.tensor([pb]) for pb in pb_indices]
 
-        pa = torch.cat([self.embeddings(ix) for ix in paIndices]).mean(dim=0)
-        pb = torch.cat([self.embeddings(ix) for ix in pbIndices]).mean(dim=0)
+        if len(pa_indices) > 0:
+            pa = torch.cat([self.embeddings(ix) for ix in pa_indices]).mean(dim=0)
+        else:
+            pa = self.OOVEmbeddings(LinearQN.PA_OOV).squeeze()
 
+        if len(pb_indices) > 0:
+            pb = torch.cat([self.embeddings(ix) for ix in pb_indices]).mean(dim=0)
+        else:
+            pb = self.OOVEmbeddings(LinearQN.PB_OOV).squeeze()
 
         return torch.cat([torch.FloatTensor(features), pa, pb])
 
