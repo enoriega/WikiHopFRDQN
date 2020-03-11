@@ -32,12 +32,13 @@ def zero_init(m):
 
 
 class BaseApproximator(nn.Module):
-    def __init__(self, num_feats, zero_init_params=False, device="cpu"):
+    def __init__(self, num_feats, zero_init_params=False, device="cpu", use_embeddings=False):
         super().__init__()
         self.cache = Cache(size=1000)
         self.num_feats = num_feats
 
         self.device = device
+        self.use_embeddings = use_embeddings
 
         self.layers = self.build_layers(num_feats)
 
@@ -49,7 +50,7 @@ class BaseApproximator(nn.Module):
         pass
 
     @abstractmethod
-    def dictionary2Tensor(self, data):
+    def dictionary_to_tensor(self, data, use_embeddings):
         pass
 
     def backprop(self, data, gamma=0.9, alpha=1.0):
@@ -61,11 +62,11 @@ class BaseApproximator(nn.Module):
         next_action = data['next_action']
 
         self.eval()
-        action_values = self(self.dictionary2Tensor(state))  # TODO Factorize the data to tensor into a function
+        action_values = self(self.dictionary_to_tensor(state, self.use_embeddings))
         self.train()
         # The next_action_values computation is tricky, as it involves looking at many possible states
         with torch.no_grad():
-            next_action_values = self(self.dictionary2Tensor(next_state))  # TODO Factorize the data to tensor into a function
+            next_action_values = self(self.dictionary_to_tensor(next_state, self.use_embeddings))
 
         # updates = [r + gamma * q.max() for r, q in zip(rewards, next_action_values.detach())]
         # This change shortcuts the update to not account for the next action state when the reward is observed, because
@@ -310,11 +311,11 @@ class DQN(BaseApproximator):
 
 class LinearQN(BaseApproximator):
     """This is a linear approximator that doesn't use the embeddings at all"""
-    PA_OOV = torch.tensor([0], requires_grad=False)
-    PB_OOV = torch.tensor([1], requires_grad=False)
+    PA_OOV = torch.tensor([0])
+    PB_OOV = torch.tensor([1])
 
-    def __init__(self, num_feats, helper, zero_init_params, device):
-        super().__init__(num_feats, zero_init_params, device)
+    def __init__(self, num_feats, helper, zero_init_params, device, use_embeddings):
+        super().__init__(num_feats, zero_init_params, device, use_embeddings)
         self.embeddings = helper
         self.OOVEmbeddings = nn.Embedding(2, 100)
 
@@ -328,8 +329,9 @@ class LinearQN(BaseApproximator):
         values = self.layers(data)
         return values
 
-    def dictionary2Tensor(self, data):
+    def dictionary_to_tensor(self, data, embeddings):
         features = [data[k] for k in sorted(data) if "Lemma_" not in k]
+        features = torch.FloatTensor(features)
 
         def group_participant_features(data, prefix):
             keys = sorted(filter(lambda k: k.startswith(prefix), data))
@@ -342,29 +344,34 @@ class LinearQN(BaseApproximator):
 
             return lemmas
 
-        pa_indices = group_participant_features(data, "paLemma")
-        pa_indices = [torch.tensor([pa]) for pa in pa_indices]
-        pb_indices = group_participant_features(data, "pbLemma")
-        pb_indices = [torch.tensor([pb]) for pb in pb_indices]
+        if embeddings:
 
-        if len(pa_indices) > 0:
-            pa = torch.cat([self.embeddings(ix) for ix in pa_indices]).mean(dim=0)
+            pa_indices = group_participant_features(data, "paLemma")
+            pa_indices = [torch.tensor([pa]) for pa in pa_indices]
+            pb_indices = group_participant_features(data, "pbLemma")
+            pb_indices = [torch.tensor([pb]) for pb in pb_indices]
+
+            if len(pa_indices) > 0:
+                pa = torch.cat([self.embeddings(ix) for ix in pa_indices]).mean(dim=0)
+            else:
+                pa = self.OOVEmbeddings(LinearQN.PA_OOV).squeeze()
+
+            if len(pb_indices) > 0:
+                pb = torch.cat([self.embeddings(ix) for ix in pb_indices]).mean(dim=0)
+            else:
+                pb = self.OOVEmbeddings(LinearQN.PB_OOV).squeeze()
+
+            return torch.cat([features, pa, pb])
+
         else:
-            pa = self.OOVEmbeddings(LinearQN.PA_OOV).squeeze()
-
-        if len(pb_indices) > 0:
-            pb = torch.cat([self.embeddings(ix) for ix in pb_indices]).mean(dim=0)
-        else:
-            pb = self.OOVEmbeddings(LinearQN.PB_OOV).squeeze()
-
-        return torch.cat([torch.FloatTensor(features), pa, pb])
+            return features
 
 
 class MLP(LinearQN):
     """This is a linear approximator that doesn't use the embeddings at all"""
 
-    def __init__(self, num_feats, helper, zero_init_params, device):
-        super().__init__(num_feats, helper, zero_init_params, device)
+    def __init__(self, num_feats, helper, zero_init_params, device, use_embeddings):
+        super().__init__(num_feats, helper, zero_init_params, device, use_embeddings)
 
     def build_layers(self, num_feats):
         return nn.Sequential(

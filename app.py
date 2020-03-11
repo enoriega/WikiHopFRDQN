@@ -26,6 +26,7 @@ bert_cfg = cfg['bert']
 glove_path = embeddings_cfg['glove_path']
 voc_path = embeddings_cfg['voc_path']
 freeze_embeddings = embeddings_cfg['freeze']
+use_embeddings = embeddings_cfg['activate']
 
 model_dir = cfg['model_dir']
 
@@ -93,15 +94,17 @@ def select_action():
         # This is necessary to compute the number features dynamically
         global network
         if not network:
-            k = len(list(filter(lambda key: "Lemma_" not in key, data.keys()))) + 200
-            network = Approximator(k, helper, zero_init, device=device)
+            k = len(list(filter(lambda key: "Lemma_" not in key, data.keys())))
+            if use_embeddings:
+                k += 200
+            network = Approximator(k, helper, zero_init, device=device, use_embeddings=use_embeddings)
             if torch.cuda.is_available():
                 network = network.cuda()
 
         # Don't need to hold to the gradient here
         with torch.no_grad():
             network.eval()
-            tensor = network.dictionary2Tensor(data)
+            tensor = network.dictionary_to_tensor(data, use_embeddings)
             values = network(tensor)
             ret = values.tolist()
 
@@ -116,8 +119,10 @@ def backwards():
         data = json.loads(request.data)
         global network
         if not network:
-            k = len(data) + 200
-            network = Approximator(k, helper, zero_init_params=zero_init, device=device)
+            k = len(data)
+            if use_embeddings:
+                k += 200
+            network = Approximator(k, helper, zero_init_params=zero_init, device=device, use_embeddings=use_embeddings)
             if torch.cuda.is_available():
                 network = network.cuda()
 
@@ -211,7 +216,7 @@ def load():
         else:
             k = state['layers.0.weight'].shape[1]
 
-        network = Approximator(k, helper, zero_init_params=zero_init, device=device)
+        network = Approximator(k, helper, zero_init_params=zero_init, device=device, use_embeddings=use_embeddings)
         network.load_state_dict(state)
         if torch.cuda.is_available():
             network = network.cuda()
