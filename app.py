@@ -12,6 +12,8 @@ import dqn
 from bert.PrecomputedBert import PrecomputedBert
 from dqn import DQN, LinearQN, MLP, BQN, BaseApproximator
 from embeddings import EmbeddingsHelper, load_embeddings_matrix
+from torch.nn import EmbeddingBag, Embedding
+
 
 wsgi = Flask(__name__)
 
@@ -171,11 +173,14 @@ def backwards():
 
 @wsgi.route('/last_loss', methods=['GET'])
 def get_loss():
-    global last_loss
-    if last_loss:
-        return str(last_loss)
-    else:
-        "Woops"
+    try:
+        global last_loss
+        if last_loss:
+            return str(last_loss)
+        else:
+            "Woops"
+    except:
+        return str(0.0)
 
 
 @wsgi.route('/save', methods=['GET', 'POST'])
@@ -193,6 +198,7 @@ def save():
         # Don't save anything if this is a debugging session
         if not is_debug:
             state = network.state_dict()
+            del state['embeddings.weight']
             torch.save(state, path)
 
         return "Saved the model into %s" % model_name
@@ -217,6 +223,8 @@ def load():
             k = state['layers.0.weight'].shape[1]
 
         network = Approximator(k, helper, zero_init_params=zero_init, device=device, use_embeddings=use_embeddings)
+        if type(helper) in {EmbeddingBag, Embedding}:
+            state['embeddings.weight'] = helper.weight
         network.load_state_dict(state)
         if torch.cuda.is_available():
             network = network.cuda()

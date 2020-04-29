@@ -13,6 +13,7 @@ def load_embeddings_matrix(path):
     matrix = torch.FloatTensor(data)
     return matrix
 
+
 class EmbeddingsHelper:
 
     def __init__(self, data_path, voc_path, freeze=False):

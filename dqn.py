@@ -374,15 +374,32 @@ class MLP(LinearQN):
         super().__init__(num_feats, helper, zero_init_params, device, use_embeddings)
 
     def build_layers(self, num_feats):
+        # return nn.Sequential(
+        #     nn.Linear(num_feats, 100),
+        #     nn.LeakyReLU(),
+        #     nn.Dropout(),
+        #     nn.Linear(100, 20),
+        #     nn.LeakyReLU(),
+        #     nn.Dropout(),
+        #     nn.Linear(20, 10),
+        #     nn.LeakyReLU(),
+        #     nn.Dropout(),
+        #     nn.Linear(10, 2),
+        # )
+
         return nn.Sequential(
             nn.Linear(num_feats, 100),
             nn.LeakyReLU(),
-            nn.Dropout(),
-            nn.Linear(100, 20),
-            nn.LeakyReLU(),
-            nn.Dropout(),
-            nn.Linear(20, 10),
-            nn.LeakyReLU(),
-            nn.Dropout(),
-            nn.Linear(10, 2),
+            nn.Dropout(0.5),
+            nn.Linear(100, 2),
+            # nn.LeakyReLU(),
+            # nn.Dropout(0.5),
+            # nn.Linear(20, 10),
+            # nn.LeakyReLU(),
+            # nn.Dropout(0.5),
+            # nn.Linear(10, 2),
         )
+
+    def forward(self, data):
+        values = self.layers(data)
+        return values
