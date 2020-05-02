@@ -87,7 +87,7 @@ def sample(data, size):
 if __name__ == "__main__":
     helper = EmbeddingsHelper(glove_path, voc_path)
     network = LinearQN(k, helper, False)
-    trainer = optim.RMSprop(network.parameters())
+    optimizer = optim.RMSprop(network.parameters())
 
     # Generate random transitions
     data = generate_data(100000, .05)
@@ -103,7 +103,7 @@ if __name__ == "__main__":
         print(loss)
         print(next_actions.value_counts())
         # Optimize the model
-        trainer.zero_grad()
+        optimizer.zero_grad()
         loss.backward()
         for param in network.parameters():
             param.grad.data.clamp_(-1, 1)
@@ -111,6 +111,6 @@ if __name__ == "__main__":
         x = death_gradient(network.parameters())
 
         print("Dead gradient proportion: %f" % x)
-        trainer.step()
+        optimizer.step()
 
 

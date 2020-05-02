@@ -36,7 +36,8 @@ model_dir = cfg['model_dir']
 helper = None
 
 network: BaseApproximator = None
-trainer: optim.Optimizer = None
+optimizer: optim.Optimizer = None
+lr_scheduler = None
 zero_init: bool = False
 Approximator: type = None  # This is the default approximator class used
 prev_grad = dict()
@@ -128,22 +129,30 @@ def backwards():
             if torch.cuda.is_available():
                 network = network.cuda()
 
-        global trainer
-        if not trainer:
-            trainer = optim.RMSprop(network.parameters())
+        learning_rate = data['rate']
+
+        global optimizer, lr_scheduler
+        if not optimizer:
+            optimizer = optim.RMSprop(network.parameters(), lr= learning_rate)
+            # lr_scheduler = optim.lr_scheduler.StepLR(trainer, 1, gamma=0.99)
 
         network.train()
+
         loss = network.backprop(data)
 
+        # Assign learning rate to parameters
+        for group in optimizer.param_groups:
+            group['lr'] = learning_rate
+
         # Optimize the model
-        trainer.zero_grad()
+        optimizer.zero_grad()
         loss.backward()
         current_grad = dict()
         for ix, param in enumerate(network.parameters()):
             if param.grad is not None:
                 param.grad.data.clamp_(-1, 1)
                 current_grad[ix] = param.grad.data
-        trainer.step()
+        optimizer.step()
 
         # Record the change in the gradient
         change = 0
@@ -163,6 +172,7 @@ def backwards():
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
+        # lr_scheduler.step()
         # print("Death gradients: %f" % dqn.death_gradient(network.parameters()))
 
         return str(change)
@@ -237,9 +247,10 @@ def load():
 
 @wsgi.route('/reset', methods=['GET'])
 def reset():
-    global network, trainer, helper, prev_grad, Approximator
+    global network, optimizer, helper, prev_grad, Approximator, lr_scheduler
     network = None
-    trainer = None
+    optimizer = None
+    lr_scheduler = None
     prev_grad = dict()
     # Approximator = None
 

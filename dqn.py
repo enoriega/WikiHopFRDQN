@@ -53,7 +53,7 @@ class BaseApproximator(nn.Module):
     def dictionary_to_tensor(self, data, use_embeddings):
         pass
 
-    def backprop(self, data, gamma=0.9, alpha=1.0):
+    def backprop(self, data, gamma=0.8, alpha=1.0):
 
         state = data['state']
         action = data['action']
@@ -71,7 +71,10 @@ class BaseApproximator(nn.Module):
         # updates = [r + gamma * q.max() for r, q in zip(rewards, next_action_values.detach())]
         # This change shortcuts the update to not account for the next action state when the reward is observed, because
         # this is when the transition was to the final state, which by definition has a value of zero
-        update = reward if reward != 0 else reward + gamma * next_action_values.max()
+        # TODO Uncomment for QLearning
+        # update = reward if reward != 0 else reward + gamma * next_action_values.max()
+        # TODO Uncomment for SARSA
+        update = reward if reward != 0 else reward + gamma * next_action_values[next_action]
 
         target_values = action_values.clone().detach()
 
