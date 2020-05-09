@@ -81,7 +81,8 @@ class BaseApproximator(nn.Module):
         # target_values[col_ix] += (alpha * (update - target_values[col_ix]))
         target_values[action] = update
 
-        loss = F.smooth_l1_loss(action_values, target_values)
+        # loss = F.smooth_l1_loss(action_values, target_values)
+        loss = F.mse_loss(action_values, target_values)
 
         return loss
 
@@ -392,7 +393,7 @@ class MLP(LinearQN):
 
         return nn.Sequential(
             nn.Linear(num_feats, 100),
-            nn.LeakyReLU(),
+            nn.Tanh(),
             nn.Dropout(0.5),
             nn.Linear(100, 2),
             # nn.LeakyReLU(),

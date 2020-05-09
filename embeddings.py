@@ -1,3 +1,5 @@
+import os
+
 import torch
 import numpy as np
 import itertools as it
@@ -5,12 +7,17 @@ from torch import nn
 
 
 def load_embeddings_matrix(path):
-    # Load the embeddings matrix
-    with open(path) as f:
-        lines = [l for ix, l in enumerate(f) if ix > 0]
+    preloaded_path = path + '.npy'
+    if os.path.exists(preloaded_path):
+        data = np.load(preloaded_path)
+    else:
+        # Load the embeddings matrix
+        with open(path) as f:
+            lines = [l for ix, l in enumerate(f) if ix > 0]
 
-    data = [[float(d) for d in t[1:]] for t in (l.split() for l in lines)]
-    matrix = torch.FloatTensor(data)
+        data = np.asarray([[float(d) for d in t[1:]] for t in (l.split() for l in lines)])
+        np.save(preloaded_path, data)
+    matrix = torch.from_numpy(data).float()
     return matrix
 
 

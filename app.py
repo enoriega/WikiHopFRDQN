@@ -7,13 +7,14 @@ import yaml
 import torch.optim as optim
 from flask import Flask, request
 from transformers import BertConfig
+from waitress.utilities import InternalServerError
 
 import dqn
 from bert.PrecomputedBert import PrecomputedBert
 from dqn import DQN, LinearQN, MLP, BQN, BaseApproximator
 from embeddings import EmbeddingsHelper, load_embeddings_matrix
 from torch.nn import EmbeddingBag, Embedding
-
+import numpy as np
 
 wsgi = Flask(__name__)
 
@@ -42,6 +43,10 @@ zero_init: bool = False
 Approximator: type = None  # This is the default approximator class used
 prev_grad = dict()
 last_loss = None
+print("Loading embeddings ...")
+matrix = torch.from_numpy(np.zeros((10, 200)))
+# matrix = load_embeddings_matrix(glove_path)
+# print("Finished loading embeddings")
 
 
 #########################
@@ -65,7 +70,7 @@ def configuration_hook():
         if val.lower() == 'linear':
             Approximator = LinearQN
             # helper = EmbeddingsHelper(glove_path, voc_path, freeze_embeddings)
-            matrix = load_embeddings_matrix(glove_path)
+            # matrix = load_embeddings_matrix(glove_path)
             helper = torch.nn.EmbeddingBag.from_pretrained(matrix)
         elif val.lower() == 'dqn':
             Approximator = DQN
@@ -73,7 +78,7 @@ def configuration_hook():
         elif val.lower() == 'mlp':
             Approximator = MLP
             # helper = EmbeddingsHelper(glove_path, voc_path, freeze_embeddings)
-            matrix = load_embeddings_matrix(glove_path)
+            # matrix = load_embeddings_matrix(glove_path)
             helper = torch.nn.EmbeddingBag.from_pretrained(matrix)
         elif val.lower() == 'bqn':
             Approximator = BQN
@@ -119,13 +124,15 @@ def select_action():
 @wsgi.route('/backwards', methods=['GET', 'PUT'])
 def backwards():
     if request.method == "PUT":
+
         data = json.loads(request.data)
         global network
         if not network:
             k = len(data)
             if use_embeddings:
                 k += 200
-            network = Approximator(k, helper, zero_init_params=zero_init, device=device, use_embeddings=use_embeddings)
+            network = Approximator(k, helper, zero_init_params=zero_init, device=device,
+                                   use_embeddings=use_embeddings)
             if torch.cuda.is_available():
                 network = network.cuda()
 
@@ -133,7 +140,8 @@ def backwards():
 
         global optimizer, lr_scheduler
         if not optimizer:
-            optimizer = optim.RMSprop(network.parameters(), lr= learning_rate)
+            optimizer = optim.SGD(network.parameters(), lr=learning_rate)
+            # optimizer = optim.RMSprop(network.parameters(), lr= learning_rate)
             # lr_scheduler = optim.lr_scheduler.StepLR(trainer, 1, gamma=0.99)
 
         network.train()
@@ -149,9 +157,10 @@ def backwards():
         loss.backward()
         current_grad = dict()
         for ix, param in enumerate(network.parameters()):
+            current_grad[ix] = param.data.clone().detach()
             if param.grad is not None:
                 param.grad.data.clamp_(-1, 1)
-                current_grad[ix] = param.grad.data
+                # pass
         optimizer.step()
 
         # Record the change in the gradient
@@ -183,14 +192,11 @@ def backwards():
 
 @wsgi.route('/last_loss', methods=['GET'])
 def get_loss():
-    try:
-        global last_loss
-        if last_loss:
-            return str(last_loss)
-        else:
-            "Woops"
-    except:
-        return str(0.0)
+    global last_loss
+    if last_loss is not None:
+        return str(last_loss)
+    else:
+        return "100000"
 
 
 @wsgi.route('/save', methods=['GET', 'POST'])
